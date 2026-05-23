@@ -1,0 +1,24 @@
+name: Send M365 Campaign
+on:
+  push:
+    paths: ['send_m365.py']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Send Step 1 Intro Emails
+        env:
+          ZEPTO_TOKEN: ${{ secrets.ZEPTO_TOKEN }}
+        run: python3 send_m365.py
+      - name: Commit log
+        if: always()
+        run: |
+          git config user.email "bot@skymaxx.company"
+          git config user.name "Bot"
+          git add -f send_log.txt || true
+          git diff --staged --quiet && echo "no changes" || git commit -m "send log [skip ci]"
+          git push || true
