@@ -9,12 +9,86 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - run: echo "RENDER_KEY_LEN=${#RENDER_API_KEY}" && echo "hello_$(date)" > deploy_debug.txt && cat deploy_debug.txt
+
+      - name: Call Render API and save result
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-      - run: |
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          ZEPTO_TOKEN: ${{ secrets.ZEPTO_TOKEN }}
+        run: |
+          echo "Key length: ${#RENDER_API_KEY}"
+          
+          # Call owners endpoint
+          curl -s             -H "Authorization: Bearer $RENDER_API_KEY"             -H "Accept: application/json"             "https://api.render.com/v1/owners?limit=1"             -o owners.json
+          echo "=== OWNERS ===" && cat owners.json
+          
+          # Extract owner ID
+          OWNER_ID=$(python3 -c "import json; d=json.load(open('owners.json')); print(d[0]['owner']['id'])" 2>&1)
+          echo "Owner ID: $OWNER_ID"
+          
+          # List services
+          curl -s             -H "Authorization: Bearer $RENDER_API_KEY"             -H "Accept: application/json"             "https://api.render.com/v1/services?limit=20"             -o services.json
+          echo "=== SERVICES ===" && cat services.json | python3 -c "
+import sys,json
+svcs = json.load(sys.stdin)
+for s in svcs:
+    svc = s.get('service',{})
+    print(svc.get('name'), svc.get('id'), svc.get('serviceDetails',{}).get('url','?'))
+" 2>&1 || cat services.json
+          
+          # Create service if not exists
+          EXISTING=$(python3 -c "
+import json
+svcs = json.load(open('services.json'))
+for s in svcs:
+    if s.get('service',{}).get('name') == 'skymaxx-lead-engine':
+        svc = s['service']
+        print(svc['id'] + '|' + svc.get('serviceDetails',{}).get('url','building'))
+        break
+" 2>/dev/null || echo "")
+          
+          if [ -n "$EXISTING" ]; then
+            SVC_ID=$(echo "$EXISTING" | cut -d'|' -f1)
+            SVC_URL=$(echo "$EXISTING" | cut -d'|' -f2)
+            echo "Found existing: $SVC_ID -> $SVC_URL"
+            curl -s -X POST               -H "Authorization: Bearer $RENDER_API_KEY"               -H "Content-Type: application/json"               "https://api.render.com/v1/services/$SVC_ID/deploys" -d '{}'
+          else
+            echo "Creating service..."
+            curl -s -X POST               -H "Authorization: Bearer $RENDER_API_KEY"               -H "Content-Type: application/json"               "https://api.render.com/v1/services"               -d "{
+                \"type\": \"web_service\",
+                \"name\": \"skymaxx-lead-engine\",
+                \"ownerId\": \"$OWNER_ID\",
+                \"repo\": \"https://github.com/tkpthalayck/skymaxx-lead-engine\",
+                \"branch\": \"main\",
+                \"autoDeploy\": \"yes\",
+                \"serviceDetails\": {
+                  \"runtime\": \"python\",
+                  \"buildCommand\": \"pip install -r requirements.txt\",
+                  \"startCommand\": \"gunicorn app:app --bind 0.0.0.0:\$PORT --workers 2 --timeout 120\",
+                  \"plan\": \"free\",
+                  \"region\": \"oregon\",
+                  \"envVars\": [
+                    {\"key\": \"GOOGLE_MAPS_API_KEY\", \"value\": \"$GOOGLE_MAPS_API_KEY\"},
+                    {\"key\": \"ZEPTO_TOKEN\", \"value\": \"$ZEPTO_TOKEN\"},
+                    {\"key\": \"FROM_EMAIL\", \"value\": \"support@skymaxx.company\"},
+                    {\"key\": \"FROM_NAME\", \"value\": \"Ali | SKYMAXX IT Solutions\"},
+                    {\"key\": \"DB_PATH\", \"value\": \"skymaxx.db\"}
+                  ]
+                }
+              }" -o create.json
+            echo "=== CREATE RESPONSE ===" && cat create.json
+            SVC_URL=$(python3 -c "import json; d=json.load(open('create.json')); print(d.get('service',{}).get('serviceDetails',{}).get('url','building'))" 2>/dev/null || echo "building")
+          fi
+          
+          echo "$SVC_URL" > LIVE_URL.txt
+          echo "$(cat owners.json)" >> deploy_debug.txt
+          echo "SERVICES:$(cat services.json)" >> deploy_debug.txt
+          echo "URL:$SVC_URL" >> deploy_debug.txt
+
+      - name: Commit results
+        run: |
           git config user.email "bot@skymaxx.company"
           git config user.name "SKYMAXX Bot"
-          git add -f deploy_debug.txt
-          git commit -m "test [skip ci]"
-          git push
+          git add -f deploy_debug.txt LIVE_URL.txt owners.json services.json 2>/dev/null || true
+          git commit -m "deploy results [skip ci]" || echo "nothing to commit"
+          git push || echo "push failed"
