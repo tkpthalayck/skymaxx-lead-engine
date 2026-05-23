@@ -1,21 +1,17 @@
 name: Check Render Status
 on:
   workflow_dispatch:
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Get Render Services
+      - name: List Render Services
         run: |
-          RESP=$(curl -s -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}"             -H "Accept: application/json"             "https://api.render.com/v1/services?limit=20")
-          echo "$RESP" | python3 -c "
+          curl -s             -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}"             -H "Accept: application/json"             "https://api.render.com/v1/services?limit=20" | python3 -c "
 import sys, json
 services = json.load(sys.stdin)
 for s in services:
-  srv = s.get('service', {})
-  name = srv.get('name','')
-  sid  = srv.get('id','')
-  url  = srv.get('serviceDetails',{}).get('url','')
-  status = srv.get('suspended','')
-  print(f'NAME={name} ID={sid} URL={url} STATUS={status}')
+    srv = s.get("service", {})
+    print("SERVICE:", srv.get("name",""), "|", srv.get("id",""), "|", srv.get("serviceDetails",{}).get("url","no-url"))
 "
