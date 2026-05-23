@@ -9,41 +9,12 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Debug - write file
-        run: |
-          echo "=== ENV CHECK ===" 
-          echo "KEY prefix: ${RENDER_API_KEY:0:8}"
-          python3 -c "
-import os, urllib.request, urllib.error, json
-key = os.environ.get('RENDER_API_KEY','')
-print(f'Key len={len(key)} prefix={key[:8]}')
-try:
-    req = urllib.request.Request(
-        'https://api.render.com/v1/owners?limit=1',
-        headers={'Authorization': f'Bearer {key}', 'Accept': 'application/json'}
-    )
-    resp = urllib.request.urlopen(req, timeout=15)
-    data = resp.read().decode()
-    print('SUCCESS:', data[:300])
-    with open('deploy_debug.txt','w') as f: f.write('OK:' + data[:200])
-except urllib.error.HTTPError as e:
-    err = e.read().decode()
-    print('HTTP ERROR', e.code, err[:300])
-    with open('deploy_debug.txt','w') as f: f.write(f'HTTP {e.code}: {err[:200]}')
-except Exception as e:
-    print('EXCEPTION', e)
-    with open('deploy_debug.txt','w') as f: f.write(f'EXC: {e}')
-"
-          cat deploy_debug.txt
+      - run: echo "RENDER_KEY_LEN=${#RENDER_API_KEY}" && echo "hello_$(date)" > deploy_debug.txt && cat deploy_debug.txt
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-
-      - name: Commit result
-        run: |
+      - run: |
           git config user.email "bot@skymaxx.company"
           git config user.name "SKYMAXX Bot"
           git add -f deploy_debug.txt
-          git status
-          git commit -m "debug output [skip ci]" || echo "nothing to commit"
-          git push || echo "push failed"
+          git commit -m "test [skip ci]"
+          git push
