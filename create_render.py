@@ -1,95 +1,85 @@
-import os, sys, json, urllib.request, urllib.error, time
+import os, json, urllib.request, urllib.error, time
 
-KEY   = os.environ.get("RENDER_API_KEY", "")
-MAPS  = os.environ.get("GOOGLE_MAPS_API_KEY", "")
-ZEPTO = os.environ.get("ZEPTO_TOKEN", "")
-BASE  = "https://api.render.com/v1"
-HDR   = {"Authorization": "Bearer " + KEY, "Accept": "application/json", "Content-Type": "application/json"}
+KEY = os.environ.get("RENDER_API_KEY", "")
+HDR = {"Authorization": "Bearer " + KEY, "Accept": "application/json"}
 
 log = []
 def p(msg): s = str(msg); print(s, flush=True); log.append(s)
 
-def api(method, path, body=None, retries=3):
-    data = json.dumps(body).encode() if body is not None else None
-    for attempt in range(retries):
-        req = urllib.request.Request(BASE + path, data=data, method=method, headers=HDR)
-        try:
-            resp = urllib.request.urlopen(req, timeout=30)
-            result = json.loads(resp.read())
-            p("OK " + method + " " + path)
-            return result
-        except urllib.error.HTTPError as e:
-            err = e.read().decode()
-            p("ERR " + method + " " + path + " HTTP " + str(e.code) + " attempt " + str(attempt+1) + ": " + err[:200])
-            if e.code == 429:
-                wait = 30 * (attempt + 1)
-                p("Rate limited — waiting " + str(wait) + "s before retry...")
-                time.sleep(wait)
-            else:
-                raise
-    raise Exception("All retries failed for " + method + " " + path)
-
-url = "https://skymaxx-lead-engine.onrender.com"
+# 1. List Render services
+p("=== Render Services ===")
 try:
-    p("key_len=" + str(len(KEY)))
-    owners = api("GET", "/owners?limit=1")
-    owner_id = owners[0]["owner"]["id"]
-    p("owner_id=" + owner_id)
-
-    services = api("GET", "/services?limit=20")
-    p("services_count=" + str(len(services)))
-
-    existing = None
+    req = urllib.request.Request("https://api.render.com/v1/services?limit=10", headers=HDR)
+    resp = urllib.request.urlopen(req, timeout=30)
+    services = json.loads(resp.read())
+    p("Total services: " + str(len(services)))
+    target_url = None
+    target_id = None
     for s in services:
         svc = s.get("service", {})
-        p("svc=" + svc.get("name","?") + " " + svc.get("id","?"))
-        if svc.get("name") == "skymaxx-lead-engine":
-            existing = svc
+        name = svc.get("name", "?")
+        sid  = svc.get("id", "?")
+        url  = svc.get("serviceDetails", {}).get("url", "no-url")
+        suspended = svc.get("suspended", "?")
+        p("  - " + name + " | " + sid + " | " + url + " | suspended=" + suspended)
+        if name == "skymaxx-lead-engine":
+            target_url = url
+            target_id = sid
+except Exception as e:
+    p("Render API error: " + str(e))
 
-    if existing:
-        sid = existing["id"]
-        url = existing.get("serviceDetails", {}).get("url", url)
-        p("found=" + sid + " url=" + url)
-        r = api("POST", "/services/" + sid + "/deploys", {})
-        p("deploy_id=" + str(r.get("id", "?")))
-    else:
-        p("creating service...")
-        payload = {
-            "type": "web_service",
-            "name": "skymaxx-lead-engine",
-            "ownerId": owner_id,
-            "repo": "https://github.com/tkpthalayck/skymaxx-lead-engine",
-            "branch": "main",
-            "autoDeploy": "yes",
-            "serviceDetails": {
-                "runtime": "python",
-                "buildCommand": "pip install -r requirements.txt",
-                "startCommand": "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120",
-                "plan": "free",
-                "region": "oregon",
-                "envVars": [
-                    {"key": "GOOGLE_MAPS_API_KEY", "value": MAPS},
-                    {"key": "ZEPTO_TOKEN",         "value": ZEPTO},
-                    {"key": "FROM_EMAIL",          "value": "support@skymaxx.company"},
-                    {"key": "FROM_NAME",           "value": "Ali | SKYMAXX IT Solutions"},
-                    {"key": "DB_PATH",             "value": "skymaxx.db"},
-                ]
-            }
-        }
-        result = api("POST", "/services", payload)
-        p("create_result=" + json.dumps(result)[:400])
-        svc = result.get("service", {})
-        url = svc.get("serviceDetails", {}).get("url", url)
-        p("created url=" + url)
+# 2. Check deploy status of our service
+if target_id:
+    p("\n=== Latest Deploy Status ===")
+    try:
+        req = urllib.request.Request(
+            "https://api.render.com/v1/services/" + target_id + "/deploys?limit=1",
+            headers=HDR)
+        resp = urllib.request.urlopen(req, timeout=30)
+        deploys = json.loads(resp.read())
+        for d in deploys:
+            dep = d.get("deploy", {})
+            p("  Status: " + str(dep.get("status","?")))
+            p("  Created: " + str(dep.get("createdAt","?")))
+            p("  Finished: " + str(dep.get("finishedAt","?")))
+            p("  Commit: " + str(dep.get("commit",{}).get("message","?"))[:80])
+    except Exception as e:
+        p("Deploy check error: " + str(e))
 
-    p("LIVE_URL=" + url)
+# 3. Ping the live URL
+if target_url:
+    p("\n=== Pinging Live URL: " + target_url + " ===")
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(target_url, headers={"User-Agent": "SKYMAXX-Health-Check"})
+            resp = urllib.request.urlopen(req, timeout=30)
+            code = resp.getcode()
+            body = resp.read()[:300].decode("utf-8", errors="replace")
+            p("Attempt " + str(attempt+1) + ": HTTP " + str(code) + " | " + str(len(body)) + " bytes")
+            p("Body preview: " + body[:200])
+            break
+        except urllib.error.HTTPError as e:
+            p("Attempt " + str(attempt+1) + ": HTTP " + str(e.code) + " " + e.reason)
+            if attempt < 2:
+                time.sleep(10)
+        except Exception as e:
+            p("Attempt " + str(attempt+1) + ": ERROR " + str(e))
+            if attempt < 2:
+                time.sleep(10)
 
-except Exception as exc:
-    import traceback
-    p("EXCEPTION: " + traceback.format_exc())
+# 4. Test API endpoint
+if target_url:
+    p("\n=== Testing /api/stats endpoint ===")
+    try:
+        req = urllib.request.Request(target_url + "/api/stats")
+        resp = urllib.request.urlopen(req, timeout=30)
+        body = resp.read().decode()
+        p("HTTP " + str(resp.getcode()) + " | " + body[:300])
+    except Exception as e:
+        p("API test error: " + str(e))
 
 with open("deploy_debug.txt", "w") as f:
     f.write("\n".join(log))
 with open("LIVE_URL.txt", "w") as f:
-    f.write(url + "\n")
-p("Files written.")
+    f.write((target_url or "https://skymaxx-lead-engine.onrender.com") + "\n")
+p("Done.")
