@@ -1,90 +1,54 @@
 
-import os, sys, json, urllib.request, urllib.error
+import os, sys, json, urllib.request, urllib.error, traceback
+
+log = []
+def p(msg):
+    print(msg)
+    log.append(str(msg))
 
 KEY = os.environ.get("RENDER_API_KEY", "")
-print(f"API Key length: {len(KEY)}, starts: {KEY[:8]}...")
-
-BASE = "https://api.render.com/v1"
+p(f"Key length: {len(KEY)}, prefix: '{KEY[:12]}'")
 
 def api(method, path, data=None):
-    url = BASE + path
+    url = "https://api.render.com/v1" + path
     body = json.dumps(data).encode() if data else None
     req = urllib.request.Request(url, data=body, method=method,
-        headers={
-            "Authorization": f"Bearer {KEY}",
-            "Accept": "application/json",
-            "Content-Type": "application/json"
-        })
+        headers={"Authorization": f"Bearer {KEY}",
+                 "Accept": "application/json",
+                 "Content-Type": "application/json"})
     try:
         resp = urllib.request.urlopen(req, timeout=30)
         raw = resp.read()
-        print(f"  {method} {path} -> HTTP 200, {len(raw)} bytes")
-        return json.loads(raw)
+        parsed = json.loads(raw)
+        p(f"  OK {method} {path} [{len(raw)}b]")
+        return parsed
     except urllib.error.HTTPError as e:
         body = e.read().decode()
-        print(f"  {method} {path} -> HTTP {e.code}: {body[:500]}")
-        raise
+        p(f"  ERR {method} {path} HTTP {e.code}: {body[:600]}")
+        return {"error": e.code, "body": body}
+    except Exception as e:
+        p(f"  EXC {method} {path}: {e}")
+        return {"error": str(e)}
 
 try:
-    print("\n--- Step 1: Get owners ---")
+    p("=== Getting owners ===")
     owners = api("GET", "/owners?limit=1")
-    print(f"Owners raw: {json.dumps(owners)[:300]}")
-    owner_id = owners[0]["owner"]["id"]
-    print(f"Owner ID: {owner_id}")
+    p(f"Raw: {json.dumps(owners)[:400]}")
 
-    print("\n--- Step 2: List services ---")
-    services = api("GET", "/services?limit=20")
-    print(f"Services count: {len(services)}")
-    for s in services:
-        svc = s.get("service", {})
-        print(f"  {svc.get('name')} | {svc.get('id')} | {svc.get('serviceDetails',{}).get('url','?')}")
-
-    existing = next((s["service"] for s in services
-                     if s.get("service",{}).get("name") == "skymaxx-lead-engine"), None)
-
-    if existing:
-        sid = existing["id"]
-        svc_url = existing.get("serviceDetails",{}).get("url","https://skymaxx-lead-engine.onrender.com")
-        print(f"\nService found: {sid} -> {svc_url}")
-        api("POST", f"/services/{sid}/deploys", {})
-        print("Redeploy triggered")
+    if "error" in owners:
+        p("FAILED at owners step")
     else:
-        print("\nCreating new service...")
-        MAPS = os.environ.get("GOOGLE_MAPS_API_KEY","")
-        ZEPTO = os.environ.get("ZEPTO_TOKEN","")
-        payload = {
-            "type": "web_service",
-            "name": "skymaxx-lead-engine",
-            "ownerId": owner_id,
-            "repo": "https://github.com/tkpthalayck/skymaxx-lead-engine",
-            "branch": "main",
-            "autoDeploy": "yes",
-            "serviceDetails": {
-                "runtime": "python",
-                "buildCommand": "pip install -r requirements.txt",
-                "startCommand": "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120",
-                "plan": "free",
-                "region": "oregon",
-                "envVars": [
-                    {"key": "GOOGLE_MAPS_API_KEY", "value": MAPS},
-                    {"key": "ZEPTO_TOKEN",         "value": ZEPTO},
-                    {"key": "FROM_EMAIL",          "value": "support@skymaxx.company"},
-                    {"key": "FROM_NAME",           "value": "Ali | SKYMAXX IT Solutions"},
-                    {"key": "DB_PATH",             "value": "skymaxx.db"},
-                ]
-            }
-        }
-        result = api("POST", "/services", payload)
-        svc = result.get("service", {})
-        sid = svc.get("id","?")
-        svc_url = svc.get("serviceDetails",{}).get("url","https://skymaxx-lead-engine.onrender.com")
-        print(f"Created: {sid} -> {svc_url}")
+        owner_id = owners[0]["owner"]["id"]
+        p(f"Owner ID: {owner_id}")
 
-    with open("LIVE_URL.txt", "w") as f:
-        f.write(svc_url + "\n")
-    print(f"\nDone! Live URL: {svc_url}")
+        p("=== Listing services ===")
+        services = api("GET", "/services?limit=20")
+        p(f"Services raw: {json.dumps(services)[:600]}")
 
-except Exception as e:
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
+except Exception:
+    p("EXCEPTION:")
+    p(traceback.format_exc())
+
+with open("deploy_debug.txt", "w") as f:
+    f.write("\n".join(log))
+p("Wrote deploy_debug.txt")
