@@ -1,34 +1,38 @@
-import os, sys, json, urllib.request, urllib.error
+import os, sys, json, urllib.request, urllib.error, time
 
-KEY  = os.environ.get("RENDER_API_KEY", "")
-MAPS = os.environ.get("GOOGLE_MAPS_API_KEY", "")
-ZEPTO= os.environ.get("ZEPTO_TOKEN", "")
-BASE = "https://api.render.com/v1"
-HDR  = {"Authorization": "Bearer " + KEY,
-        "Accept": "application/json",
-        "Content-Type": "application/json"}
+KEY   = os.environ.get("RENDER_API_KEY", "")
+MAPS  = os.environ.get("GOOGLE_MAPS_API_KEY", "")
+ZEPTO = os.environ.get("ZEPTO_TOKEN", "")
+BASE  = "https://api.render.com/v1"
+HDR   = {"Authorization": "Bearer " + KEY, "Accept": "application/json", "Content-Type": "application/json"}
 
 log = []
 def p(msg): s = str(msg); print(s, flush=True); log.append(s)
 
-def api(method, path, body=None):
+def api(method, path, body=None, retries=3):
     data = json.dumps(body).encode() if body is not None else None
-    req  = urllib.request.Request(BASE + path, data=data, method=method, headers=HDR)
-    try:
-        resp = urllib.request.urlopen(req, timeout=30)
-        result = json.loads(resp.read())
-        p("OK " + method + " " + path)
-        return result
-    except urllib.error.HTTPError as e:
-        err = e.read().decode()
-        p("ERR " + method + " " + path + " HTTP " + str(e.code) + ": " + err[:300])
-        raise
+    for attempt in range(retries):
+        req = urllib.request.Request(BASE + path, data=data, method=method, headers=HDR)
+        try:
+            resp = urllib.request.urlopen(req, timeout=30)
+            result = json.loads(resp.read())
+            p("OK " + method + " " + path)
+            return result
+        except urllib.error.HTTPError as e:
+            err = e.read().decode()
+            p("ERR " + method + " " + path + " HTTP " + str(e.code) + " attempt " + str(attempt+1) + ": " + err[:200])
+            if e.code == 429:
+                wait = 30 * (attempt + 1)
+                p("Rate limited — waiting " + str(wait) + "s before retry...")
+                time.sleep(wait)
+            else:
+                raise
+    raise Exception("All retries failed for " + method + " " + path)
 
 url = "https://skymaxx-lead-engine.onrender.com"
 try:
     p("key_len=" + str(len(KEY)))
     owners = api("GET", "/owners?limit=1")
-    p("owners=" + json.dumps(owners)[:200])
     owner_id = owners[0]["owner"]["id"]
     p("owner_id=" + owner_id)
 
@@ -47,7 +51,7 @@ try:
         url = existing.get("serviceDetails", {}).get("url", url)
         p("found=" + sid + " url=" + url)
         r = api("POST", "/services/" + sid + "/deploys", {})
-        p("deploy_id=" + r.get("id", "?"))
+        p("deploy_id=" + str(r.get("id", "?")))
     else:
         p("creating service...")
         payload = {
@@ -84,7 +88,6 @@ except Exception as exc:
     import traceback
     p("EXCEPTION: " + traceback.format_exc())
 
-# Always write output files
 with open("deploy_debug.txt", "w") as f:
     f.write("\n".join(log))
 with open("LIVE_URL.txt", "w") as f:
