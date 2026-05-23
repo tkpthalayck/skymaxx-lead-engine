@@ -1,0 +1,16 @@
+name: Keep Alive
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # every 10 minutes
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping app to prevent sleep
+        run: |
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 https://skymaxx-lead-engine.onrender.com/api/stats)
+          echo "Ping HTTP: $CODE"
+          if [ "$CODE" != "200" ]; then
+            echo "Warning: unexpected status code"
+          fi
