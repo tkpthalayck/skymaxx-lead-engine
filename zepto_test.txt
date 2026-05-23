@@ -1,0 +1,7 @@
+=== ZeptoMail Connection Test ===
+Token length: 160
+Token prefix: Zoho-enczapikey wSsVR61++Bf2B6...
+HTTP 201
+Response: {"data":[{"code":"EM_104","additional_info":[],"message":"Email request received"}],"message":"OK","request_id":"2d6f.2b2922627eac007e.m1.bea2e890-56db-11f1-890a-5254001dc20d.19e56437599","object":"email"}
+
+✅ SUCCESS — Test email sent to support@skymaxx.company
