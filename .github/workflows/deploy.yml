@@ -12,103 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create or redeploy Render service
-        id: render
-        run: |
-          set -e
-          KEY="${{ secrets.RENDER_API_KEY }}"
+      - name: Run deploy script
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          ZEPTO_TOKEN: ${{ secrets.ZEPTO_TOKEN }}
+        run: python3 deploy_render.py
 
-          # Get owner ID
-          OWNER=$(curl -sf -H "Authorization: Bearer $KEY" \
-            "https://api.render.com/v1/owners?limit=1")
-          echo "Owner response: $OWNER"
-          OWNER_ID=$(echo "$OWNER" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['owner']['id'])")
-          echo "Owner ID: $OWNER_ID"
-
-          # List existing services
-          SERVICES=$(curl -sf -H "Authorization: Bearer $KEY" \
-            "https://api.render.com/v1/services?limit=20")
-          echo "Services: $SERVICES"
-
-          # Check if our service exists
-          SVC_ID=$(echo "$SERVICES" | python3 -c "
-import sys,json
-svcs = json.load(sys.stdin)
-for s in svcs:
-    if s.get('service',{}).get('name') == 'skymaxx-lead-engine':
-        print(s['service']['id'])
-        break
-" 2>/dev/null || echo "")
-
-          if [ -n "$SVC_ID" ]; then
-            echo "Service exists: $SVC_ID — redeploying..."
-            curl -sf -X POST -H "Authorization: Bearer $KEY" \
-              "https://api.render.com/v1/services/$SVC_ID/deploys" \
-              -H "Content-Type: application/json" -d '{}'
-            SVC_URL=$(echo "$SERVICES" | python3 -c "
-import sys,json
-svcs = json.load(sys.stdin)
-for s in svcs:
-    if s.get('service',{}).get('name') == 'skymaxx-lead-engine':
-        print(s['service'].get('serviceDetails',{}).get('url','https://skymaxx-lead-engine.onrender.com'))
-        break
-")
-          else
-            echo "Creating new service..."
-            PAYLOAD=$(python3 -c "
-import json
-d = {
-  'type': 'web_service',
-  'name': 'skymaxx-lead-engine',
-  'ownerId': '$OWNER_ID',
-  'repo': 'https://github.com/tkpthalayck/skymaxx-lead-engine',
-  'branch': 'main',
-  'autoDeploy': 'yes',
-  'serviceDetails': {
-    'runtime': 'python',
-    'buildCommand': 'pip install -r requirements.txt',
-    'startCommand': 'gunicorn app:app --bind 0.0.0.0:\$PORT --workers 2 --timeout 120',
-    'plan': 'free',
-    'region': 'oregon',
-    'envVars': [
-      {'key': 'GOOGLE_MAPS_API_KEY', 'value': '${{ secrets.GOOGLE_MAPS_API_KEY }}'},
-      {'key': 'ZEPTO_TOKEN',         'value': '${{ secrets.ZEPTO_TOKEN }}'},
-      {'key': 'FROM_EMAIL',          'value': 'support@skymaxx.company'},
-      {'key': 'FROM_NAME',           'value': 'Ali | SKYMAXX IT Solutions'},
-      {'key': 'DB_PATH',             'value': 'skymaxx.db'}
-    ]
-  }
-}
-print(json.dumps(d))
-")
-            CREATE=$(curl -sf -X POST \
-              -H "Authorization: Bearer $KEY" \
-              -H "Content-Type: application/json" \
-              "https://api.render.com/v1/services" \
-              -d "$PAYLOAD")
-            echo "Create response: $CREATE"
-            SVC_ID=$(echo "$CREATE" | python3 -c "import sys,json; print(json.load(sys.stdin)['service']['id'])")
-            SVC_URL=$(echo "$CREATE" | python3 -c "import sys,json; print(json.load(sys.stdin)['service'].get('serviceDetails',{}).get('url','https://skymaxx-lead-engine.onrender.com'))")
-            echo "Created service: $SVC_ID"
-          fi
-
-          echo "SERVICE_URL=$SVC_URL" >> $GITHUB_OUTPUT
-          echo "SERVICE_ID=$SVC_ID"   >> $GITHUB_OUTPUT
-          echo "Live URL: $SVC_URL"
-
-      - name: Save URL to file
-        run: |
-          URL="${{ steps.render.outputs.SERVICE_URL }}"
-          if [ -z "$URL" ]; then
-            URL="https://skymaxx-lead-engine.onrender.com"
-          fi
-          echo "$URL" > LIVE_URL.txt
-          echo "Saved: $URL"
-
-      - name: Commit LIVE_URL
+      - name: Commit live URL
         run: |
           git config user.email "bot@skymaxx.company"
           git config user.name "SKYMAXX Bot"
           git add LIVE_URL.txt
           git diff --staged --quiet || git commit -m "chore: save live URL [skip ci]"
-          git push
+          git push || true
