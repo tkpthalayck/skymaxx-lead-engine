@@ -9,97 +9,17 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Deploy to Render
+      - name: Deploy
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          GOOGLE_MAPS_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-          ZEPTO: ${{ secrets.ZEPTO_TOKEN }}
-        shell: python3 {0}
-        run: |
-          import os, json, urllib.request, urllib.error
-
-          KEY   = os.environ["RENDER_API_KEY"]
-          MAPS  = os.environ.get("GOOGLE_MAPS_KEY","")
-          ZEPTO = os.environ.get("ZEPTO","")
-          BASE  = "https://api.render.com/v1"
-          HDR   = {"Authorization":f"Bearer {KEY}","Accept":"application/json","Content-Type":"application/json"}
-
-          def api(m, path, data=None):
-              req = urllib.request.Request(BASE+path,
-                  data=json.dumps(data).encode() if data else None,
-                  method=m, headers=HDR)
-              r = urllib.request.urlopen(req, timeout=30)
-              return json.loads(r.read())
-
-          log = []
-          def w(msg): print(msg); log.append(str(msg))
-
-          try:
-              owners = api("GET", "/owners?limit=1")
-              w(f"owners={json.dumps(owners)[:200]}")
-              owner_id = owners[0]["owner"]["id"]
-              w(f"owner_id={owner_id}")
-
-              svcs = api("GET", "/services?limit=20")
-              w(f"services_count={len(svcs)}")
-              for s in svcs:
-                  svc = s.get("service",{})
-                  w(f"  svc={svc.get('name')} id={svc.get('id')}")
-
-              existing = next((s["service"] for s in svcs
-                  if s.get("service",{}).get("name") == "skymaxx-lead-engine"), None)
-
-              if existing:
-                  sid = existing["id"]
-                  url = existing.get("serviceDetails",{}).get("url","building")
-                  w(f"found={sid} url={url}")
-                  api("POST", f"/services/{sid}/deploys", {})
-                  w("redeployed")
-              else:
-                  w("creating service...")
-                  payload = {
-                      "type": "web_service",
-                      "name": "skymaxx-lead-engine",
-                      "ownerId": owner_id,
-                      "repo": "https://github.com/tkpthalayck/skymaxx-lead-engine",
-                      "branch": "main",
-                      "autoDeploy": "yes",
-                      "serviceDetails": {
-                          "runtime": "python",
-                          "buildCommand": "pip install -r requirements.txt",
-                          "startCommand": "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120",
-                          "plan": "free",
-                          "region": "oregon",
-                          "envVars": [
-                              {"key":"GOOGLE_MAPS_API_KEY","value":MAPS},
-                              {"key":"ZEPTO_TOKEN","value":ZEPTO},
-                              {"key":"FROM_EMAIL","value":"support@skymaxx.company"},
-                              {"key":"FROM_NAME","value":"Ali | SKYMAXX IT Solutions"},
-                              {"key":"DB_PATH","value":"skymaxx.db"},
-                          ]
-                      }
-                  }
-                  result = api("POST", "/services", payload)
-                  w(f"create_result={json.dumps(result)[:400]}")
-                  svc = result.get("service",{})
-                  url = svc.get("serviceDetails",{}).get("url","https://skymaxx-lead-engine.onrender.com")
-                  w(f"created url={url}")
-
-              with open("LIVE_URL.txt","w") as f: f.write(url+"\n")
-              with open("deploy_debug.txt","w") as f: f.write("\n".join(log))
-              w("DONE")
-
-          except Exception as e:
-              import traceback
-              msg = traceback.format_exc()
-              w(f"ERROR: {msg}")
-              with open("deploy_debug.txt","w") as f: f.write("\n".join(log))
-
-      - name: Commit results
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          ZEPTO_TOKEN: ${{ secrets.ZEPTO_TOKEN }}
+        run: python3 deploy_render.py
+      - name: Save results
+        if: always()
         run: |
           git config user.email "bot@skymaxx.company"
           git config user.name "SKYMAXX Bot"
           git add -f deploy_debug.txt LIVE_URL.txt 2>/dev/null || true
-          git commit -m "deploy results [skip ci]" || echo "nothing to commit"
+          git commit -m "results [skip ci]" || true
           git push || true
