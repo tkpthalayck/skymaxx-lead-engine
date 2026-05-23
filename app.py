@@ -531,6 +531,34 @@ def import_csv():
     conn.commit(); conn.close()
     return jsonify({"imported": imported})
 
+# ── BULK SET SEQUENCE STEP (for leads already sent outside the app) ──
+@app.route("/api/sequence/set_step", methods=["POST"])
+def set_step():
+    """Mark leads as already at step N (so they don't get sent step 1 again).
+    Useful after sending step 1 externally via GitHub Actions."""
+    data = request.json
+    emails = data.get("emails", [])
+    step   = int(data.get("step", 1))
+    if not emails: return jsonify({"error": "no emails"}), 400
+    
+    from datetime import datetime, timedelta
+    conn = get_db()
+    next_step = step + 1
+    if next_step > 5:
+        return jsonify({"error": "step must be 1-4"}), 400
+    next_tpl = SEQUENCE_TEMPLATES[next_step - 1]
+    next_at = (datetime.utcnow() + timedelta(days=next_tpl["delay_days"])).isoformat()
+    
+    updated = 0
+    for email in emails:
+        cur = conn.execute("""UPDATE leads 
+            SET sequence_step=?, in_sequence=1, next_send_at=?
+            WHERE email=?""", [step, next_at, email])
+        if cur.rowcount > 0: updated += 1
+    conn.commit(); conn.close()
+    return jsonify({"updated": updated, "next_send_at": next_at, "next_step": next_step})
+
+
 # ── CONFIG STATUS ──
 @app.route("/api/config")
 def config_check():
