@@ -9,20 +9,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Create Render service
+      - name: Health Check
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-          ZEPTO_TOKEN: ${{ secrets.ZEPTO_TOKEN }}
         run: python3 create_render.py
-
       - name: Commit results
         if: always()
         run: |
           git config user.email "bot@skymaxx.company"
           git config user.name "Bot"
-          git add -f deploy_debug.txt LIVE_URL.txt
-          git status
-          git commit -m "deploy results [skip ci]"
-          git push
+          git add -f deploy_debug.txt LIVE_URL.txt || true
+          git diff --staged --quiet && echo "Nothing to commit" || git commit -m "health check [skip ci]"
+          git push || true
