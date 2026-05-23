@@ -2,15 +2,29 @@ name: Deploy to Render
 on:
   push:
     branches: [main]
+permissions:
+  contents: write
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy
+
+      - name: Call Render API
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-          ZEPTO_TOKEN: ${{ secrets.ZEPTO_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 deploy_render.py
+        run: |
+          echo "Key starts with: ${RENDER_API_KEY:0:8}"
+          curl -s             -H "Authorization: Bearer $RENDER_API_KEY"             -H "Accept: application/json"             "https://api.render.com/v1/owners?limit=1" > deploy_debug.txt
+          echo "" >> deploy_debug.txt
+          curl -s             -H "Authorization: Bearer $RENDER_API_KEY"             -H "Accept: application/json"             "https://api.render.com/v1/services?limit=10" >> deploy_debug.txt
+          cat deploy_debug.txt
+
+      - name: Commit
+        if: always()
+        run: |
+          git config user.email "bot@skymaxx.company"
+          git config user.name "Bot"
+          git add -f deploy_debug.txt
+          git commit -m "api response [skip ci]" || true
+          git push || true
