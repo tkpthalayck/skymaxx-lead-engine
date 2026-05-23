@@ -3,654 +3,429 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>SKYMAXX Lead Engine</title>
+<title>SKYMAXX Lead Engine v2 — Sequences + Auto-Reply</title>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
 <style>
 :root {
-  --bg:       #0a0e1a;
-  --surface:  #111827;
-  --surface2: #1a2235;
-  --border:   #1e2d45;
-  --accent:   #3b82f6;
-  --accent2:  #06b6d4;
-  --gold:     #f59e0b;
-  --green:    #10b981;
-  --red:      #ef4444;
-  --text:     #e2e8f0;
-  --muted:    #64748b;
-  --radius:   10px;
+  --bg:#0a0e1a; --surface:#111827; --surface2:#1a2235; --border:#1e2d45;
+  --accent:#3b82f6; --accent2:#06b6d4; --gold:#f59e0b; --green:#10b981; --red:#ef4444;
+  --text:#e2e8f0; --muted:#64748b; --r:10px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;display:flex}
-
-/* SIDEBAR */
-.sidebar{width:230px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh;display:flex}
+.sidebar{width:230px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);position:fixed;left:0;top:0;bottom:0}
 .logo{padding:22px 20px;border-bottom:1px solid var(--border)}
-.logo h1{font-size:17px;font-weight:700;color:#fff;letter-spacing:.5px}
+.logo h1{font-size:17px;color:#fff}
 .logo span{font-size:11px;color:var(--muted)}
-.nav{flex:1;padding:12px 0}
-.nav-item{display:flex;align-items:center;gap:11px;padding:11px 20px;cursor:pointer;color:var(--muted);font-size:14px;transition:.2s;border-left:3px solid transparent}
+.nav-item{display:flex;align-items:center;gap:11px;padding:11px 20px;cursor:pointer;color:var(--muted);font-size:14px;border-left:3px solid transparent;transition:.2s}
 .nav-item:hover{color:var(--text);background:var(--surface2)}
 .nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(59,130,246,.08)}
-.nav-item i{width:18px;text-align:center}
-.sidebar-footer{padding:16px 20px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
-
-/* MAIN */
-.main{margin-left:230px;flex:1;display:flex;flex-direction:column;min-height:100vh}
-.topbar{padding:16px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface)}
-.topbar h2{font-size:18px;font-weight:600}
-.status-dots{display:flex;gap:12px;font-size:12px}
+.main{margin-left:230px;flex:1}
+.topbar{padding:16px 28px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;background:var(--surface)}
+.topbar h2{font-size:18px}
+.dots{display:flex;gap:12px;font-size:12px}
 .dot{display:flex;align-items:center;gap:5px}
-.dot-circle{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-.dot-circle.ok{background:var(--green)}
-.dot-circle.err{background:var(--red)}
-
-.content{padding:24px 28px;flex:1}
-
-/* TABS */
-.tabs{display:flex;gap:4px;margin-bottom:24px;background:var(--surface);padding:4px;border-radius:var(--radius);width:fit-content}
-.tab{padding:8px 20px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--muted);transition:.2s;white-space:nowrap}
-.tab.active{background:var(--accent);color:#fff;font-weight:600}
-.tab-panel{display:none}
-.tab-panel.active{display:block}
-
-/* STATS GRID */
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
-.stat-card .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-.stat-card .value{font-size:28px;font-weight:700;margin:6px 0 2px;color:#fff}
-.stat-card .sub{font-size:12px;color:var(--muted)}
+.dc{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dc.ok{background:var(--green)} .dc.err{background:var(--red)}
+.content{padding:24px 28px}
+.tab-panel{display:none} .tab-panel.active{display:block}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px}
+.stat-card .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.stat-card .value{font-size:26px;font-weight:700;color:#fff;margin:5px 0 2px}
+.stat-card .sub{font-size:11px;color:var(--muted)}
 .stat-card.blue .value{color:var(--accent)}
-.stat-card.gold .value{color:var(--gold)}
 .stat-card.green .value{color:var(--green)}
+.stat-card.gold .value{color:var(--gold)}
 .stat-card.cyan .value{color:var(--accent2)}
-
-/* CARDS */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px}
-.card-title{font-size:14px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px;color:var(--text)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.card-title{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .card-title i{color:var(--accent)}
-
-/* FORM ELEMENTS */
-.form-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
-.form-group{display:flex;flex-direction:column;gap:6px;flex:1;min-width:180px}
-label{font-size:12px;color:var(--muted);font-weight:500}
-input,select,textarea{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;transition:.2s;width:100%}
-input:focus,select:focus,textarea:focus{border-color:var(--accent)}
-select option{background:var(--surface2)}
-textarea{resize:vertical;min-height:120px;font-family:inherit}
-
-/* BUTTONS */
+.form-row{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.form-group{display:flex;flex-direction:column;gap:5px;flex:1;min-width:160px}
+label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+input,select,textarea{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;width:100%}
+input:focus,select:focus{border-color:var(--accent)}
+textarea{min-height:100px;font-family:inherit;resize:vertical}
 .btn{padding:9px 18px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;transition:.2s}
 .btn-primary{background:var(--accent);color:#fff}
 .btn-primary:hover{background:#2563eb}
 .btn-success{background:var(--green);color:#fff}
-.btn-success:hover{background:#059669}
 .btn-gold{background:var(--gold);color:#000}
-.btn-gold:hover{background:#d97706}
 .btn-danger{background:var(--red);color:#fff}
-.btn-danger:hover{background:#dc2626}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
 .btn-outline:hover{border-color:var(--accent);color:var(--accent)}
-.btn:disabled{opacity:.5;cursor:not-allowed}
 .btn-sm{padding:5px 12px;font-size:12px}
-
-/* TABLE */
-.table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:var(--surface2);padding:11px 14px;text-align:left;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
-td{padding:11px 14px;border-top:1px solid var(--border);vertical-align:middle}
+th{background:var(--surface2);padding:10px 13px;text-align:left;font-size:11px;color:var(--muted);text-transform:uppercase}
+td{padding:10px 13px;border-top:1px solid var(--border)}
 tr:hover td{background:rgba(255,255,255,.02)}
-.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.badge{padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block}
 .badge-new{background:rgba(59,130,246,.15);color:var(--accent)}
-.badge-sent{background:rgba(16,185,129,.15);color:var(--green)}
-.badge-failed{background:rgba(239,68,68,.15);color:var(--red)}
-.badge-skip{background:rgba(100,116,139,.15);color:var(--muted)}
-
-/* SEARCH RESULTS */
-.result-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--border);font-size:13px}
-.result-row:first-child{border-top:none}
-.result-name{font-weight:600;color:#fff}
-.result-meta{color:var(--muted);font-size:12px;margin-top:2px}
-
-/* ALERT */
-.alert{padding:10px 14px;border-radius:7px;font-size:13px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.badge-seq{background:rgba(245,158,11,.15);color:var(--gold)}
+.badge-replied{background:rgba(16,185,129,.15);color:var(--green)}
+.badge-done{background:rgba(100,116,139,.15);color:var(--muted)}
+.step-pill{display:inline-block;padding:2px 7px;border-radius:4px;background:var(--surface2);color:var(--accent);font-size:11px;font-weight:600;margin-right:4px}
+.alert{padding:10px 14px;border-radius:7px;font-size:13px;margin-bottom:12px}
 .alert-info{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd}
 .alert-success{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#6ee7b7}
-.alert-error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
 .alert-warn{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#fcd34d}
-
-/* PAGINATION */
-.pagination{display:flex;gap:6px;align-items:center;margin-top:16px}
-.page-btn{padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px}
-.page-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
-.page-btn:disabled{opacity:.4;cursor:not-allowed}
-
-/* LOADING */
-.spinner{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+.alert-error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
+.sequence-step{background:var(--surface2);padding:14px;border-radius:8px;margin-bottom:10px;border-left:3px solid var(--accent)}
+.sequence-step .step-h{display:flex;justify-content:space-between;margin-bottom:6px}
+.sequence-step .step-name{font-weight:600;color:#fff}
+.sequence-step .step-delay{font-size:11px;color:var(--muted)}
+.sequence-step .step-subject{font-size:13px;color:var(--accent2);margin-bottom:6px}
+.sequence-step .step-body{font-size:12px;color:var(--muted);max-height:80px;overflow:hidden;text-overflow:ellipsis}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-
-/* CHECKBOX */
-input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent)}
-
-/* FILTER BAR */
-.filter-bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
-.filter-bar input,.filter-bar select{flex:1;min-width:140px;max-width:220px}
-
-/* EMPTY STATE */
-.empty{text-align:center;padding:48px 20px;color:var(--muted)}
-.empty i{font-size:40px;margin-bottom:12px;opacity:.4}
-.empty p{font-size:14px}
-
-/* PROGRESS BAR */
-.progress-bar{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-top:8px}
+.progress-bar{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-top:6px}
 .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s}
-
-.flex{display:flex}
-.gap-2{gap:8px}
-.items-center{align-items:center}
-.justify-between{justify-content:space-between}
-.ml-auto{margin-left:auto}
-.text-muted{color:var(--muted)}
-.text-sm{font-size:12px}
-.mt-2{margin-top:8px}
-.mr-2{margin-right:8px}
+input[type=checkbox]{width:14px;height:14px;accent-color:var(--accent)}
+.flex{display:flex} .gap-2{gap:8px} .ml-auto{margin-left:auto} .mt-2{margin-top:8px}
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty i{font-size:36px;margin-bottom:10px;opacity:.4}
+.filter-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-bar input,.filter-bar select{flex:1;min-width:140px;max-width:220px}
 </style>
 </head>
 <body>
 
-<!-- SIDEBAR -->
 <aside class="sidebar">
-  <div class="logo">
-    <h1>⚡ SKYMAXX</h1>
-    <span>Lead Engine v1.0</span>
-  </div>
-  <nav class="nav">
-    <div class="nav-item active" onclick="showTab('dashboard')"><i class="fas fa-chart-pie"></i> Dashboard</div>
-    <div class="nav-item" onclick="showTab('search')"><i class="fas fa-search-location"></i> Find Leads</div>
-    <div class="nav-item" onclick="showTab('leads')"><i class="fas fa-users"></i> Manage Leads</div>
-    <div class="nav-item" onclick="showTab('campaigns')"><i class="fas fa-paper-plane"></i> Email Campaigns</div>
-    <div class="nav-item" onclick="showTab('settings')"><i class="fas fa-cog"></i> Settings</div>
+  <div class="logo"><h1>⚡ SKYMAXX</h1><span>Lead Engine v2.0</span></div>
+  <nav style="padding:12px 0">
+    <div class="nav-item active" onclick="tab('dashboard')"><i class="fas fa-chart-pie"></i> Dashboard</div>
+    <div class="nav-item" onclick="tab('search')"><i class="fas fa-search-location"></i> Find Leads</div>
+    <div class="nav-item" onclick="tab('leads')"><i class="fas fa-users"></i> Manage Leads</div>
+    <div class="nav-item" onclick="tab('sequence')"><i class="fas fa-stream"></i> Email Sequence</div>
+    <div class="nav-item" onclick="tab('log')"><i class="fas fa-history"></i> Send Log</div>
+    <div class="nav-item" onclick="tab('settings')"><i class="fas fa-cog"></i> Settings</div>
   </nav>
-  <div class="sidebar-footer">support@royalgroups.store<br/>© 2026 SKYMAXX</div>
+  <div style="position:absolute;bottom:16px;left:20px;font-size:11px;color:var(--muted)">support@royalgroups.store<br/>© 2026 SKYMAXX</div>
 </aside>
 
-<!-- MAIN -->
 <main class="main">
   <div class="topbar">
     <h2 id="page-title">Dashboard</h2>
-    <div class="status-dots" id="status-dots">
-      <div class="dot"><div class="dot-circle" id="dot-maps"></div> Google Maps</div>
-      <div class="dot"><div class="dot-circle" id="dot-zepto"></div> ZeptoMail</div>
+    <div class="dots">
+      <div class="dot"><div class="dc" id="dot-maps"></div>Google Maps</div>
+      <div class="dot"><div class="dc" id="dot-zepto"></div>ZeptoMail</div>
+      <div class="dot"><div class="dc ok"></div>Scheduler</div>
     </div>
   </div>
 
   <div class="content">
 
-    <!-- ── DASHBOARD ── -->
+    <!-- DASHBOARD -->
     <div class="tab-panel active" id="tab-dashboard">
       <div class="stats-grid">
-        <div class="stat-card blue">
-          <div class="label">Total Leads</div>
-          <div class="value" id="s-total">—</div>
-          <div class="sub" id="s-new">— new</div>
-        </div>
-        <div class="stat-card green">
-          <div class="label">Emails Sent</div>
-          <div class="value" id="s-sent">—</div>
-          <div class="sub" id="s-success">— successful</div>
-        </div>
-        <div class="stat-card gold">
-          <div class="label">With Phone</div>
-          <div class="value" id="s-phone">—</div>
-          <div class="sub">direct contact</div>
-        </div>
-        <div class="stat-card cyan">
-          <div class="label">Campaigns</div>
-          <div class="value" id="s-campaigns">—</div>
-          <div class="sub" id="s-failed">— failed</div>
-        </div>
+        <div class="stat-card blue"><div class="label">Total Leads</div><div class="value" id="s-total">—</div><div class="sub" id="s-email">— with email</div></div>
+        <div class="stat-card gold"><div class="label">In Sequence</div><div class="value" id="s-seq">—</div><div class="sub">active drips</div></div>
+        <div class="stat-card green"><div class="label">Replied</div><div class="value" id="s-rep">—</div><div class="sub">interested leads</div></div>
+        <div class="stat-card cyan"><div class="label">Today Sent</div><div class="value" id="s-today">—</div><div class="sub" id="s-limit">/ — limit</div></div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px">
         <div class="card">
-          <div class="card-title"><i class="fas fa-rocket"></i> Quick Lead Search</div>
-          <div class="form-group" style="margin-bottom:10px">
-            <label>Keyword</label>
-            <input id="q-keyword" value="IT services" placeholder="e.g. IT services, cloud provider"/>
-          </div>
-          <div class="form-group" style="margin-bottom:14px">
-            <label>City</label>
-            <select id="q-city"></select>
-          </div>
-          <button class="btn btn-primary" onclick="quickSearch()"><i class="fas fa-search"></i> Search Now</button>
-          <div id="q-result" style="margin-top:12px"></div>
+          <div class="card-title"><i class="fas fa-stream"></i> 5-Email Sequence Overview</div>
+          <div id="seq-overview"></div>
         </div>
-
         <div class="card">
-          <div class="card-title"><i class="fas fa-chart-bar"></i> Lead Sources</div>
-          <div id="lead-cities" style="font-size:13px;color:var(--muted)">Loading...</div>
+          <div class="card-title"><i class="fas fa-clock"></i> Upcoming Sends (Next 50)</div>
+          <div id="upcoming-list" style="max-height:340px;overflow-y:auto"></div>
         </div>
       </div>
     </div>
 
-    <!-- ── FIND LEADS ── -->
+    <!-- FIND LEADS -->
     <div class="tab-panel" id="tab-search">
       <div class="card">
         <div class="card-title"><i class="fas fa-search-location"></i> Google Maps Lead Finder</div>
-        <div class="alert alert-info"><i class="fas fa-info-circle"></i> Searches Google Maps to find local businesses in UAE & GCC. Each search extracts name, phone, website & address.</div>
+        <div class="alert alert-info"><i class="fas fa-info-circle"></i> Searches UAE/GCC businesses. Each result auto-generates a best-guess email (info@domain) from the website.</div>
         <div class="form-row">
-          <div class="form-group">
-            <label>Search Keyword</label>
-            <input id="s-keyword" value="IT services company" placeholder="e.g. managed IT services"/>
-          </div>
-          <div class="form-group">
-            <label>City / Location</label>
-            <select id="s-city"></select>
-          </div>
-          <div class="form-group" style="max-width:120px">
-            <label>Pages (max 3)</label>
-            <select id="s-pages">
-              <option value="1">1 (~20)</option>
-              <option value="2" selected>2 (~40)</option>
-              <option value="3">3 (~60)</option>
-            </select>
-          </div>
+          <div class="form-group"><label>Keyword</label><input id="s-kw" value="IT services company"/></div>
+          <div class="form-group"><label>City</label><select id="s-city"></select></div>
+          <div class="form-group" style="max-width:130px"><label>Pages</label><select id="s-pages"><option value="1">1 (~20)</option><option value="2" selected>2 (~40)</option><option value="3">3 (~60)</option></select></div>
         </div>
-        <button class="btn btn-primary" id="search-btn" onclick="searchLeads()"><i class="fas fa-search"></i> Search Google Maps</button>
-        <div id="search-status" style="margin-top:14px"></div>
-        <div id="search-results" style="margin-top:14px"></div>
+        <button class="btn btn-primary" id="s-btn" onclick="doSearch()"><i class="fas fa-search"></i> Search Google Maps</button>
+        <div id="s-status" class="mt-2"></div>
+        <div id="s-results" class="mt-2"></div>
       </div>
 
       <div class="card">
-        <div class="card-title"><i class="fas fa-list"></i> Bulk Search Templates</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-          <button class="btn btn-outline" onclick="bulkSearch('IT services')"><i class="fas fa-server"></i> IT Services</button>
-          <button class="btn btn-outline" onclick="bulkSearch('cloud computing')"><i class="fas fa-cloud"></i> Cloud Services</button>
-          <button class="btn btn-outline" onclick="bulkSearch('cybersecurity')"><i class="fas fa-shield-alt"></i> Cybersecurity</button>
-          <button class="btn btn-outline" onclick="bulkSearch('software company')"><i class="fas fa-code"></i> Software Companies</button>
-          <button class="btn btn-outline" onclick="bulkSearch('managed services')"><i class="fas fa-cogs"></i> Managed Services</button>
-          <button class="btn btn-outline" onclick="bulkSearch('email hosting')"><i class="fas fa-envelope"></i> Email Hosting</button>
-        </div>
+        <div class="card-title"><i class="fas fa-file-import"></i> Or Import Your Own CSV</div>
+        <div class="alert alert-info">CSV must have columns: <code>name, email, phone, website, city, country</code></div>
+        <input type="file" id="csv-file" accept=".csv"/>
+        <button class="btn btn-outline mt-2" onclick="uploadCSV()"><i class="fas fa-upload"></i> Upload</button>
+        <div id="csv-status" class="mt-2"></div>
       </div>
     </div>
 
-    <!-- ── LEADS ── -->
+    <!-- MANAGE LEADS -->
     <div class="tab-panel" id="tab-leads">
       <div class="filter-bar">
-        <input id="f-search" placeholder="🔍 Search name, website, phone..." oninput="loadLeads(1)"/>
-        <select id="f-status" onchange="loadLeads(1)">
-          <option value="">All Status</option>
-          <option value="new">New</option>
-          <option value="contacted">Contacted</option>
-          <option value="qualified">Qualified</option>
-          <option value="converted">Converted</option>
-        </select>
-        <select id="f-city" onchange="loadLeads(1)">
-          <option value="">All Cities</option>
+        <input id="f-search" placeholder="🔍 Search..." oninput="loadLeads(1)"/>
+        <select id="f-seq" onchange="loadLeads(1)">
+          <option value="">All Leads</option>
+          <option value="1">In Sequence</option>
+          <option value="0">Not in Sequence</option>
         </select>
         <button class="btn btn-outline btn-sm" onclick="loadLeads(1)"><i class="fas fa-sync"></i></button>
         <div class="ml-auto flex gap-2">
-          <button class="btn btn-outline btn-sm" onclick="exportLeads()"><i class="fas fa-download"></i> Export CSV</button>
-          <button class="btn btn-primary btn-sm" onclick="sendToSelected()"><i class="fas fa-paper-plane"></i> Email Selected</button>
+          <button class="btn btn-outline btn-sm" onclick="window.location='/api/export'"><i class="fas fa-download"></i> Export CSV</button>
+          <button class="btn btn-gold btn-sm" onclick="enrollSelected()"><i class="fas fa-play"></i> Enroll Selected in Sequence</button>
+          <button class="btn btn-success btn-sm" onclick="enrollAll()"><i class="fas fa-play-circle"></i> Enroll ALL Eligible</button>
         </div>
       </div>
-
-      <div class="table-wrap">
+      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--r)">
         <table>
-          <thead>
-            <tr>
-              <th><input type="checkbox" id="chk-all" onchange="toggleAll(this)"/></th>
-              <th>Business</th>
-              <th>Phone</th>
-              <th>Website</th>
-              <th>City</th>
-              <th>Rating</th>
-              <th>Status</th>
-              <th>Email</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="leads-tbody">
-            <tr><td colspan="9"><div class="empty"><i class="fas fa-users"></i><p>Loading leads...</p></div></td></tr>
-          </tbody>
+          <thead><tr>
+            <th><input type="checkbox" id="chk-all" onchange="toggleAll(this)"/></th>
+            <th>Business</th><th>Email</th><th>Phone</th><th>City</th><th>Sequence</th><th>Status</th>
+          </tr></thead>
+          <tbody id="leads-tb"><tr><td colspan="7"><div class="empty"><i class="fas fa-users"></i><p>Loading...</p></div></td></tr></tbody>
         </table>
       </div>
-      <div class="pagination" id="leads-pagination"></div>
+      <div id="leads-pg" class="mt-2"></div>
     </div>
 
-    <!-- ── CAMPAIGNS ── -->
-    <div class="tab-panel" id="tab-campaigns">
-      <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:20px">
-        <div>
-          <div class="card">
-            <div class="card-title"><i class="fas fa-plus"></i> New Campaign</div>
-            <div class="form-group" style="margin-bottom:10px">
-              <label>Campaign Name</label>
-              <input id="c-name" placeholder="e.g. UAE IT Founders May 2026"/>
-            </div>
-            <div class="form-group" style="margin-bottom:10px">
-              <label>Email Subject</label>
-              <input id="c-subject" value="Streamline {{name}}'s Email — Managed IT for UAE Founders"/>
-            </div>
-            <div class="form-group" style="margin-bottom:14px">
-              <label>Email Body (HTML)</label>
-              <textarea id="c-body">
-<p>Hi there,</p>
-<p>I came across <strong>{{name}}</strong> and wanted to reach out about our <strong>Managed Email &amp; IT Services</strong> built for UAE businesses.</p>
-<p>At SKYMAXX IT Solutions, we help founders:</p>
-<ul>
-  <li>✅ Set up professional business email (Microsoft 365 / Google Workspace)</li>
-  <li>✅ Configure SPF, DKIM &amp; DMARC for inbox deliverability</li>
-  <li>✅ Protect against spam, phishing &amp; data breaches</li>
-  <li>✅ 24/7 IT support with UAE-based expertise</li>
-</ul>
-<p>Can we schedule a quick 15-min call?</p>
-<p>Best regards,<br/><strong>Ali | SKYMAXX IT Solutions</strong><br/>support@royalgroups.store</p>
-              </textarea>
-            </div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--muted)">
-                <input type="checkbox" id="c-test" checked/> Test mode
-              </label>
-              <button class="btn btn-success ml-auto" onclick="sendCampaign()"><i class="fas fa-paper-plane"></i> Send Campaign</button>
-            </div>
-            <div id="c-status" style="margin-top:12px"></div>
-          </div>
-        </div>
-
-        <div>
-          <div class="card">
-            <div class="card-title"><i class="fas fa-history"></i> Past Campaigns</div>
-            <div id="campaigns-list"><div class="empty"><i class="fas fa-paper-plane"></i><p>No campaigns yet</p></div></div>
-          </div>
+    <!-- SEQUENCE -->
+    <div class="tab-panel" id="tab-sequence">
+      <div class="card">
+        <div class="card-title"><i class="fas fa-stream"></i> 5-Email Drip Sequence</div>
+        <div class="alert alert-info"><i class="fas fa-info-circle"></i> Each lead in the sequence receives these 5 emails automatically over 21 days. Variables: <code>{{name}}, {{company}}, {{city}}, {{website}}</code></div>
+        <div id="sequence-cards"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-bolt"></i> Sequence Controls</div>
+        <div class="alert alert-warn"><i class="fas fa-exclamation-triangle"></i> The scheduler runs automatically every 60 seconds. Daily send limit: <strong id="dl-info">300</strong> emails. Adjust via <code>DAILY_SEND_LIMIT</code> env variable.</div>
+        <div class="flex gap-2">
+          <button class="btn btn-danger" onclick="pauseAll()"><i class="fas fa-pause"></i> Pause ALL Sequences</button>
+          <button class="btn btn-outline" onclick="refreshOverview()"><i class="fas fa-sync"></i> Refresh Stats</button>
         </div>
       </div>
     </div>
 
-    <!-- ── SETTINGS ── -->
+    <!-- LOG -->
+    <div class="tab-panel" id="tab-log">
+      <div class="card">
+        <div class="card-title"><i class="fas fa-history"></i> Email Send Log (Last 100)</div>
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>Time</th><th>Lead</th><th>Step</th><th>Subject</th><th>Status</th></tr></thead>
+          <tbody id="log-tb"><tr><td colspan="5"><div class="empty"><i class="fas fa-envelope"></i><p>No sends yet</p></div></td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
     <div class="tab-panel" id="tab-settings">
       <div class="card">
-        <div class="card-title"><i class="fas fa-key"></i> API Configuration Status</div>
-        <div class="alert alert-warn"><i class="fas fa-lock"></i> Set API keys as <strong>Environment Variables</strong> on Render — never hard-code them.</div>
-        <div id="config-status">Loading...</div>
+        <div class="card-title"><i class="fas fa-key"></i> Connection Status</div>
+        <div id="config-info"></div>
       </div>
       <div class="card">
-        <div class="card-title"><i class="fas fa-book"></i> Environment Variables (set on Render)</div>
-        <table style="font-size:13px">
-          <thead><tr><th>Variable</th><th>Description</th><th>Example</th></tr></thead>
-          <tbody>
-            <tr><td><code>GOOGLE_MAPS_API_KEY</code></td><td>Google Maps Places API key</td><td>AIzaSy...</td></tr>
-            <tr><td><code>ZEPTO_TOKEN</code></td><td>ZeptoMail send token</td><td>Zoho-enczapikey...</td></tr>
-            <tr><td><code>FROM_EMAIL</code></td><td>Verified sender email</td><td>ali@skymaxx.company</td></tr>
-            <tr><td><code>FROM_NAME</code></td><td>Sender display name</td><td>Ali | SKYMAXX IT</td></tr>
-          </tbody>
-        </table>
+        <div class="card-title"><i class="fas fa-reply"></i> Auto-Reply Setup</div>
+        <div class="alert alert-info">ZeptoMail is <strong>send-only</strong> — to enable real auto-reply, set up inbound email parsing via Zoho Mail / Mailgun / SES, then POST to <code>/api/auto_reply</code> with: <code>{"from":"...","name":"..."}</code></div>
+        <p style="font-size:13px;margin-top:10px"><strong>Webhook endpoint:</strong> <code>POST /api/auto_reply</code></p>
+        <p style="font-size:13px"><strong>Template:</strong> "We received your message — SKYMAXX. Response within 24 hours."</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-envelope-open"></i> Test Email</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:10px">Send a test email through ZeptoMail to verify everything works</p>
+        <div class="flex gap-2">
+          <input id="test-email" placeholder="recipient@email.com" style="max-width:300px"/>
+          <button class="btn btn-primary" onclick="sendTest()"><i class="fas fa-paper-plane"></i> Send Test</button>
+        </div>
+        <div id="test-status" class="mt-2"></div>
       </div>
     </div>
 
-  </div><!-- /content -->
+  </div>
 </main>
 
 <script>
 const API = '';
-let leadsPage = 1;
-let selectedLeads = new Set();
+let leadsPage = 1, selected = new Set();
+let templates = [];
 
-// ── INIT ──────────────────────────────
 async function init() {
-  await loadCities();
+  const cities = await fetch('/api/cities').then(r=>r.json());
+  ['s-city'].forEach(id => {
+    const sel = document.getElementById(id);
+    cities.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+  });
+  templates = await fetch('/api/sequence/templates').then(r=>r.json());
+  renderSequence();
+  renderOverview();
   await loadStats();
   await loadLeads(1);
-  await loadCampaigns();
-  await checkConfig();
-  loadCityStats();
+  await loadQueue();
+  await loadConfig();
+  setInterval(loadStats, 30000);
 }
 
-// ── TABS ──────────────────────────────
-function showTab(tab) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('tab-'+tab).classList.add('active');
+function tab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n => {
-    if (n.textContent.toLowerCase().includes(tab === 'dashboard' ? 'dashboard' :
-        tab === 'search' ? 'find' : tab === 'leads' ? 'manage' :
-        tab === 'campaigns' ? 'email' : 'settings')) n.classList.add('active');
+    const t = n.textContent.toLowerCase();
+    if ((name==='dashboard'&&t.includes('dashboard'))||(name==='search'&&t.includes('find'))||
+        (name==='leads'&&t.includes('manage'))||(name==='sequence'&&t.includes('sequence'))||
+        (name==='log'&&t.includes('log'))||(name==='settings'&&t.includes('setting'))) n.classList.add('active');
   });
-  const titles = {dashboard:'Dashboard',search:'Find Leads',leads:'Manage Leads',campaigns:'Email Campaigns',settings:'Settings'};
-  document.getElementById('page-title').textContent = titles[tab] || tab;
+  const titles = {dashboard:'Dashboard',search:'Find Leads',leads:'Manage Leads',sequence:'Email Sequence',log:'Send Log',settings:'Settings'};
+  document.getElementById('page-title').textContent = titles[name];
+  if (name==='log') loadLog();
 }
 
-// ── CITIES ──────────────────────────────
-async function loadCities() {
-  const cities = await fetch('/api/cities').then(r => r.json());
-  ['s-city','q-city','f-city'].forEach(id => {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    if (id === 'f-city') sel.innerHTML = '<option value="">All Cities</option>';
-    cities.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
-  });
-}
-
-// ── STATS ──────────────────────────────
 async function loadStats() {
-  const s = await fetch('/api/stats').then(r => r.json());
+  const s = await fetch('/api/stats').then(r=>r.json());
   document.getElementById('s-total').textContent = s.total_leads;
-  document.getElementById('s-new').textContent = `${s.new_leads} new`;
-  document.getElementById('s-sent').textContent = s.emails_sent;
-  document.getElementById('s-success').textContent = `${s.success} successful`;
-  document.getElementById('s-phone').textContent = s.with_phone;
-  document.getElementById('s-campaigns').textContent = s.campaigns;
-  document.getElementById('s-failed').textContent = `${s.failed} failed`;
+  document.getElementById('s-email').textContent = s.with_email + ' with email';
+  document.getElementById('s-seq').textContent = s.in_sequence;
+  document.getElementById('s-rep').textContent = s.replied;
+  document.getElementById('s-today').textContent = s.today_sent;
+  document.getElementById('s-limit').textContent = '/ ' + s.daily_limit + ' limit';
+  document.getElementById('dl-info').textContent = s.daily_limit;
 }
 
-// ── CONFIG STATUS ──────────────────────────────
-async function checkConfig() {
-  const c = await fetch('/api/config/status').then(r => r.json());
-  document.getElementById('dot-maps').className  = 'dot-circle ' + (c.google_maps ? 'ok' : 'err');
-  document.getElementById('dot-zepto').className = 'dot-circle ' + (c.zepto_mail  ? 'ok' : 'err');
-  document.getElementById('config-status').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div class="alert ${c.google_maps ? 'alert-success' : 'alert-error'}">
-        <i class="fas fa-${c.google_maps ? 'check' : 'times'}-circle"></i>
-        Google Maps API: ${c.google_maps ? '✅ Connected' : '❌ GOOGLE_MAPS_API_KEY not set'}
+async function loadConfig() {
+  const c = await fetch('/api/config').then(r=>r.json());
+  document.getElementById('dot-maps').className = 'dc ' + (c.google_maps ? 'ok':'err');
+  document.getElementById('dot-zepto').className= 'dc ' + (c.zepto_mail  ? 'ok':'err');
+  document.getElementById('config-info').innerHTML = `
+    <div class="alert ${c.google_maps?'alert-success':'alert-error'}"><i class="fas fa-${c.google_maps?'check':'times'}-circle"></i> Google Maps: ${c.google_maps?'Connected':'NOT configured'}</div>
+    <div class="alert ${c.zepto_mail?'alert-success':'alert-error'}"><i class="fas fa-${c.zepto_mail?'check':'times'}-circle"></i> ZeptoMail: ${c.zepto_mail?`Connected — sending as <strong>${c.from_email}</strong> (reply-to: ${c.reply_to})`:'NOT configured'}</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:10px">Daily limit: ${c.daily_limit} emails/day</div>`;
+}
+
+function renderSequence() {
+  document.getElementById('sequence-cards').innerHTML = templates.map(t => `
+    <div class="sequence-step">
+      <div class="step-h">
+        <div><span class="step-pill">Step ${t.step}</span><span class="step-name">${t.name}</span></div>
+        <div class="step-delay">${t.delay_days===0?'Sent immediately on enrollment':'+'+t.delay_days+' days after previous'}</div>
       </div>
-      <div class="alert ${c.zepto_mail ? 'alert-success' : 'alert-error'}">
-        <i class="fas fa-${c.zepto_mail ? 'check' : 'times'}-circle"></i>
-        ZeptoMail: ${c.zepto_mail ? `✅ Connected — sending as <strong>${c.from_email}</strong>` : '❌ ZEPTO_TOKEN or FROM_EMAIL not set'}
-      </div>
-    </div>`;
-}
-
-// ── CITY STATS ──────────────────────────────
-async function loadCityStats() {
-  const r = await fetch('/api/leads?per_page=1000').then(r => r.json());
-  const counts = {};
-  r.leads.forEach(l => { counts[l.city] = (counts[l.city]||0)+1; });
-  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const max = sorted[0]?.[1] || 1;
-  document.getElementById('lead-cities').innerHTML = sorted.length
-    ? sorted.map(([city,n]) => `
-        <div style="margin-bottom:10px">
-          <div class="flex justify-between text-sm"><span>${city}</span><span style="color:var(--accent)">${n}</span></div>
-          <div class="progress-bar"><div class="progress-fill" style="width:${(n/max*100).toFixed(0)}%"></div></div>
-        </div>`).join('')
-    : '<div class="empty" style="padding:20px"><i class="fas fa-map-marker-alt"></i><p>No leads yet</p></div>';
-}
-
-// ── QUICK SEARCH ──────────────────────────────
-async function quickSearch() {
-  const kw   = document.getElementById('q-keyword').value;
-  const city = document.getElementById('q-city').value;
-  const div  = document.getElementById('q-result');
-  div.innerHTML = '<div class="alert alert-info"><div class="spinner mr-2"></div> Searching...</div>';
-  const r = await fetch('/api/search', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keyword:kw,city,pages:1})}).then(r=>r.json());
-  if (r.error) { div.innerHTML = `<div class="alert alert-error">${r.error}</div>`; return; }
-  div.innerHTML = `<div class="alert alert-success"><i class="fas fa-check-circle"></i> Found ${r.found} businesses — ${r.saved} new saved!</div>`;
-  loadStats(); loadCityStats();
-}
-
-// ── SEARCH LEADS ──────────────────────────────
-async function searchLeads() {
-  const kw   = document.getElementById('s-keyword').value;
-  const city = document.getElementById('s-city').value;
-  const pages= document.getElementById('s-pages').value;
-  const btn  = document.getElementById('search-btn');
-  const status = document.getElementById('search-status');
-  const results= document.getElementById('search-results');
-
-  btn.disabled = true;
-  btn.innerHTML = '<div class="spinner"></div> Searching...';
-  status.innerHTML = '<div class="alert alert-info"><i class="fas fa-map-marker-alt"></i> Calling Google Maps API — this may take 20–60 seconds...</div>';
-  results.innerHTML = '';
-
-  const r = await fetch('/api/search', {method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({keyword:kw,city,pages:parseInt(pages)})}).then(r=>r.json());
-
-  btn.disabled = false;
-  btn.innerHTML = '<i class="fas fa-search"></i> Search Google Maps';
-
-  if (r.error) { status.innerHTML = `<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ${r.error}</div>`; return; }
-
-  status.innerHTML = `<div class="alert alert-success">
-    <i class="fas fa-check-circle"></i> Found <strong>${r.found}</strong> businesses —
-    <strong>${r.saved}</strong> new saved, ${r.dupes} duplicates skipped.
-  </div>`;
-
-  results.innerHTML = `
-    <div class="table-wrap">
-      <div style="background:var(--surface2);padding:10px 14px;font-size:12px;color:var(--muted)">Results Preview</div>
-      ${r.leads.slice(0,15).map(l => `
-        <div class="result-row">
-          <div>
-            <div class="result-name">${l.name}</div>
-            <div class="result-meta">${l.address} ${l.rating ? '⭐'+l.rating : ''}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="color:var(--green);font-size:12px">${l.phone || '—'}</div>
-            <div style="color:var(--accent);font-size:12px">${l.website ? '<a href="'+l.website+'" target="_blank" style="color:var(--accent);text-decoration:none">'+l.website.replace(/https?:\/\//,'').split('/')[0]+'</a>' : '—'}</div>
-          </div>
-        </div>`).join('')}
-    </div>`;
-
-  loadStats(); loadCityStats(); loadLeads(1);
-}
-
-async function bulkSearch(kw) {
-  document.getElementById('s-keyword').value = kw;
-  showTab('search');
-  await searchLeads();
-}
-
-// ── LEADS TABLE ──────────────────────────────
-async function loadLeads(page) {
-  leadsPage = page;
-  const search = document.getElementById('f-search')?.value || '';
-  const status = document.getElementById('f-status')?.value || '';
-  const city   = document.getElementById('f-city')?.value || '';
-  const params = new URLSearchParams({page, per_page:25, search, status, city});
-  const r = await fetch(`/api/leads?${params}`).then(r=>r.json());
-
-  const tbody = document.getElementById('leads-tbody');
-  if (!r.leads.length) {
-    tbody.innerHTML = '<tr><td colspan="9"><div class="empty"><i class="fas fa-users"></i><p>No leads found</p></div></td></tr>';
-  } else {
-    tbody.innerHTML = r.leads.map(l => `
-      <tr>
-        <td><input type="checkbox" class="lead-chk" value="${l.id}" ${selectedLeads.has(l.id)?'checked':''} onchange="toggleLead(${l.id},this)"/></td>
-        <td><div style="font-weight:600;color:#fff">${l.name}</div><div style="font-size:11px;color:var(--muted)">${l.category?.split(',')[0]||''}</div></td>
-        <td style="color:var(--green)">${l.phone||'—'}</td>
-        <td>${l.website ? `<a href="${l.website}" target="_blank" style="color:var(--accent);text-decoration:none;font-size:12px">${l.website.replace(/https?:\/\//,'').split('/')[0]}</a>` : '—'}</td>
-        <td style="font-size:12px;color:var(--muted)">${l.city||'—'}</td>
-        <td style="font-size:12px">${l.rating ? '⭐ '+l.rating : '—'}</td>
-        <td><span class="badge badge-${l.status}">${l.status}</span></td>
-        <td>${l.email_sent ? `<span class="badge badge-sent">Sent</span>` : `<span class="badge badge-skip">—</span>`}</td>
-        <td>
-          <select onchange="updateStatus(${l.id},this.value)" style="padding:4px 6px;font-size:11px;width:auto">
-            <option value="">Update</option>
-            <option value="new">New</option>
-            <option value="contacted">Contacted</option>
-            <option value="qualified">Qualified</option>
-            <option value="converted">Converted</option>
-          </select>
-        </td>
-      </tr>`).join('');
-  }
-
-  const totalPages = Math.ceil(r.total / 25);
-  const pgDiv = document.getElementById('leads-pagination');
-  pgDiv.innerHTML = `
-    <span style="font-size:12px;color:var(--muted)">${r.total} leads</span>
-    <button class="page-btn" onclick="loadLeads(${page-1})" ${page<=1?'disabled':''}>‹ Prev</button>
-    ${Array.from({length:Math.min(totalPages,7)},(_,i)=>i+1).map(p=>
-      `<button class="page-btn ${p===page?'active':''}" onclick="loadLeads(${p})">${p}</button>`).join('')}
-    <button class="page-btn" onclick="loadLeads(${page+1})" ${page>=totalPages?'disabled':''}>Next ›</button>`;
-}
-
-function toggleAll(chk) { document.querySelectorAll('.lead-chk').forEach(c => { c.checked = chk.checked; toggleLead(parseInt(c.value), c); }); }
-function toggleLead(id, chk) { chk.checked ? selectedLeads.add(id) : selectedLeads.delete(id); }
-
-async function updateStatus(id, status) {
-  if (!status) return;
-  await fetch(`/api/leads/${id}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
-  loadLeads(leadsPage);
-}
-
-function exportLeads() { window.location.href = '/api/leads/export'; }
-
-// ── CAMPAIGNS ──────────────────────────────
-async function loadCampaigns() {
-  const camps = await fetch('/api/campaigns').then(r => r.json());
-  const div = document.getElementById('campaigns-list');
-  if (!camps.length) { div.innerHTML = '<div class="empty"><i class="fas fa-paper-plane"></i><p>No campaigns yet</p></div>'; return; }
-  div.innerHTML = camps.map(c => `
-    <div style="padding:12px;border-top:1px solid var(--border)">
-      <div class="flex justify-between items-center">
-        <div style="font-weight:600;font-size:13px">${c.name}</div>
-        <div style="font-size:11px;color:var(--muted)">${c.created_at?.split('T')[0]}</div>
-      </div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px">${c.subject}</div>
-      <div style="display:flex;gap:12px;margin-top:8px;font-size:12px">
-        <span style="color:var(--green)">✅ ${c.total_success} sent</span>
-        <span style="color:var(--red)">❌ ${c.total_failed} failed</span>
-        <span style="color:var(--muted)">Total: ${c.total_sent}</span>
-      </div>
+      <div class="step-subject">Subject: ${t.subject}</div>
+      <div class="step-body">${t.body.replace(/<[^>]+>/g,' ').slice(0,200)}...</div>
     </div>`).join('');
 }
 
-async function sendCampaign() {
-  const name    = document.getElementById('c-name').value;
-  const subject = document.getElementById('c-subject').value;
-  const body    = document.getElementById('c-body').value;
-  const test    = document.getElementById('c-test').checked;
-  const status  = document.getElementById('c-status');
-
-  if (!name || !subject) { status.innerHTML = '<div class="alert alert-error">Please fill in campaign name and subject.</div>'; return; }
-
-  status.innerHTML = '<div class="alert alert-info"><div class="spinner mr-2"></div> Creating campaign & sending...</div>';
-
-  // Create campaign
-  const camp = await fetch('/api/campaigns', {method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name,subject,body_html:body})}).then(r=>r.json());
-
-  // Send
-  const leadIds = selectedLeads.size > 0 ? Array.from(selectedLeads) : 'all';
-  const r = await fetch('/api/send', {method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({campaign_id:camp.id,subject,body_html:body,lead_ids:leadIds,test_mode:test})}).then(r=>r.json());
-
-  if (r.error) { status.innerHTML = `<div class="alert alert-error">${r.error}</div>`; return; }
-
-  status.innerHTML = `<div class="alert alert-success">
-    <i class="fas fa-check-circle"></i>
-    ${test ? '🧪 Test mode — ' : ''}
-    Sent: <strong>${r.sent}</strong> | Failed: <strong>${r.failed}</strong> | Skipped: <strong>${r.skipped}</strong>
-  </div>`;
-
-  loadCampaigns(); loadStats();
+function renderOverview() {
+  document.getElementById('seq-overview').innerHTML = templates.map(t => `
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--border)">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">${t.step}</div>
+      <div style="flex:1"><div style="font-weight:600">${t.name}</div><div style="font-size:11px;color:var(--muted)">${t.delay_days===0?'Day 0':'Day '+(t.step===1?0:t.step===2?3:t.step===3?7:t.step===4?14:21)}</div></div>
+    </div>`).join('');
 }
 
-async function sendToSelected() {
-  if (!selectedLeads.size) { alert('Select leads first using the checkboxes.'); return; }
-  showTab('campaigns');
+async function loadQueue() {
+  const q = await fetch('/api/sequence/queue').then(r=>r.json());
+  const div = document.getElementById('upcoming-list');
+  if (!q.upcoming.length) { div.innerHTML='<div class="empty"><i class="fas fa-inbox"></i><p>No upcoming sends</p></div>'; return; }
+  div.innerHTML = q.upcoming.map(u => `
+    <div style="padding:8px 0;border-top:1px solid var(--border);font-size:13px">
+      <div style="font-weight:600">${u.name}</div>
+      <div style="font-size:11px;color:var(--muted)">${u.email} • Step ${u.sequence_step+1}/5 • ${u.next_send_at?new Date(u.next_send_at).toLocaleString():'Now'}</div>
+    </div>`).join('');
+}
+
+async function doSearch() {
+  const kw = document.getElementById('s-kw').value;
+  const city = document.getElementById('s-city').value;
+  const pages = document.getElementById('s-pages').value;
+  const btn = document.getElementById('s-btn');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Searching...';
+  document.getElementById('s-status').innerHTML = '<div class="alert alert-info"><div class="spinner"></div> Calling Google Maps...</div>';
+  const r = await fetch('/api/search', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keyword:kw,city,pages:parseInt(pages)})}).then(r=>r.json());
+  btn.disabled=false; btn.innerHTML='<i class="fas fa-search"></i> Search Google Maps';
+  if (r.error) { document.getElementById('s-status').innerHTML=`<div class="alert alert-error">${r.error}</div>`; return; }
+  document.getElementById('s-status').innerHTML=`<div class="alert alert-success">✅ Found ${r.found} businesses — ${r.saved} new saved!</div>`;
+  loadStats(); loadLeads(1);
+}
+
+async function uploadCSV() {
+  const file = document.getElementById('csv-file').files[0];
+  if (!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  const r = await fetch('/api/import', {method:'POST',body:fd}).then(r=>r.json());
+  document.getElementById('csv-status').innerHTML = r.imported ? `<div class="alert alert-success">✅ Imported ${r.imported} leads</div>` : `<div class="alert alert-error">${r.error||'Failed'}</div>`;
+  loadStats(); loadLeads(1);
+}
+
+async function loadLeads(page) {
+  leadsPage = page;
+  const search = document.getElementById('f-search').value;
+  const inseq  = document.getElementById('f-seq').value;
+  const params = new URLSearchParams({page, per_page:25, search, in_sequence: inseq});
+  const r = await fetch(`/api/leads?${params}`).then(r=>r.json());
+  const tb = document.getElementById('leads-tb');
+  if (!r.leads.length) { tb.innerHTML='<tr><td colspan="7"><div class="empty"><i class="fas fa-users"></i><p>No leads</p></div></td></tr>'; return; }
+  tb.innerHTML = r.leads.map(l => `
+    <tr>
+      <td><input type="checkbox" class="chk" value="${l.id}" ${selected.has(l.id)?'checked':''} onchange="toggleSel(${l.id},this)"/></td>
+      <td><div style="font-weight:600;color:#fff">${l.name}</div><div style="font-size:11px;color:var(--muted)">${l.city||''}</div></td>
+      <td style="font-size:12px;color:var(--accent2)">${l.email||'—'}</td>
+      <td style="font-size:12px;color:var(--green)">${l.phone||'—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${l.city||'—'}</td>
+      <td>${l.in_sequence?`<span class="badge badge-seq">Step ${l.sequence_step}/5</span>`:l.sequence_step>=5?`<span class="badge badge-done">Completed</span>`:`<span class="badge badge-new">Not enrolled</span>`}</td>
+      <td>${l.replied?`<span class="badge badge-replied">Replied ✓</span>`:`<span class="badge badge-new">${l.status||'new'}</span>`}</td>
+    </tr>`).join('');
+  const tp = Math.ceil(r.total/25);
+  document.getElementById('leads-pg').innerHTML = `<span style="font-size:12px;color:var(--muted)">${r.total} leads</span> &nbsp;
+    <button class="btn btn-outline btn-sm" onclick="loadLeads(${page-1})" ${page<=1?'disabled':''}>‹</button>
+    Page ${page} of ${tp}
+    <button class="btn btn-outline btn-sm" onclick="loadLeads(${page+1})" ${page>=tp?'disabled':''}>›</button>`;
+}
+
+function toggleAll(chk) { document.querySelectorAll('.chk').forEach(c => { c.checked=chk.checked; toggleSel(parseInt(c.value),c); }); }
+function toggleSel(id, chk) { chk.checked?selected.add(id):selected.delete(id); }
+
+async function enrollSelected() {
+  if (!selected.size) { alert('Select leads first'); return; }
+  if (!confirm(`Enroll ${selected.size} leads in the 5-email sequence?`)) return;
+  const r = await fetch('/api/sequence/enroll', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lead_ids:Array.from(selected)})}).then(r=>r.json());
+  alert(`✅ Enrolled ${r.enrolled} leads`);
+  selected.clear(); loadStats(); loadLeads(leadsPage);
+}
+
+async function enrollAll() {
+  if (!confirm('Enroll ALL eligible leads (those with email, not in sequence, not unsubscribed) in the 5-email sequence?')) return;
+  const r = await fetch('/api/sequence/enroll', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lead_ids:'all'})}).then(r=>r.json());
+  alert(`✅ Enrolled ${r.enrolled} leads`);
+  loadStats(); loadLeads(leadsPage);
+}
+
+async function pauseAll() {
+  if (!confirm('Pause ALL active sequences?')) return;
+  await fetch('/api/sequence/pause', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lead_ids:[]})});
+  alert('All sequences paused');
+  loadStats();
+}
+
+async function refreshOverview() { loadStats(); loadQueue(); }
+
+async function loadLog() {
+  const r = await fetch('/api/log').then(r=>r.json());
+  const tb = document.getElementById('log-tb');
+  if (!r.log.length) { tb.innerHTML='<tr><td colspan="5"><div class="empty"><i class="fas fa-envelope"></i><p>No sends yet</p></div></td></tr>'; return; }
+  tb.innerHTML = r.log.map(l => `
+    <tr>
+      <td style="font-size:11px;color:var(--muted)">${new Date(l.sent_at).toLocaleString()}</td>
+      <td style="font-weight:600">${l.lead_name||'?'}</td>
+      <td><span class="step-pill">Step ${l.step}</span></td>
+      <td style="font-size:12px">${l.subject||'?'}</td>
+      <td>${l.status==='success'?'<span class="badge badge-replied">✓ Sent</span>':'<span class="badge badge-new" style="color:var(--red)">✗ '+(l.error_msg||'Failed').slice(0,40)+'</span>'}</td>
+    </tr>`).join('');
+}
+
+async function sendTest() {
+  const email = document.getElementById('test-email').value;
+  if (!email) return;
+  const r = await fetch('/api/auto_reply', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:email,name:'Test User'})}).then(r=>r.json());
+  document.getElementById('test-status').innerHTML = r.sent?`<div class="alert alert-success">✅ Sent to ${email}</div>`:`<div class="alert alert-error">${r.error||'Failed'}</div>`;
 }
 
 init();
