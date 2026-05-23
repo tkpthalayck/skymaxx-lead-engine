@@ -1,0 +1,20 @@
+=== M365 Campaign  Step 1 (Intro) ===
+Total leads: 13
+From: noreply@skymaxx.company
+Reply-to: support@skymaxx.company
+
+[1/13] abarak@maximaapparel.com | Maxima Apparel | OK SENT
+[2/13] chris.kucharski@onerail.io | OneRail | OK SENT
+[3/13] hank.jackson@edgewaterit.com | Edgewater Federal Solutions, I | OK SENT
+[4/13] james.stanford@edgewaterit.com | Edgewater Federal Solutions, I | OK SENT
+[5/13] rchurgovich@broomfield.org | Edgewater Federal Solutions, I | OK SENT
+[6/13] tom.monahan@edgewaterit.com | Edgewater Federal Solutions, I | OK SENT
+[7/13] michael.hinman@edgewaterit.com | Edgewater Federal Solutions, I | OK SENT
+[8/13] daldis@halvik.com | Halvik (for FCA) | OK SENT
+[9/13] liam.connor@intercity.technology | Intercity | OK SENT
+[10/13] mark.hawkins-wood@intercity.technology | Intercity | OK SENT
+[11/13] stewart.nicol@intercity.technology | Intercity | OK SENT
+[12/13] rick.korsak@intercity.technology | Intercity | OK SENT
+[13/13] ampem.dako@intercity.technology | Intercity | OK SENT
+
+=== Summary: 13 sent, 0 failed ===
