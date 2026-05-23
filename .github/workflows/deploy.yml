@@ -1,5 +1,4 @@
 name: Deploy to Render
-
 on:
   push:
     branches: [main]
@@ -8,98 +7,108 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy or Create Render Service
+      - name: Create or redeploy Render service
+        id: render
         run: |
-          RENDER_API_KEY="${{ secrets.RENDER_API_KEY }}"
+          set -e
+          KEY="${{ secrets.RENDER_API_KEY }}"
 
-          echo "Getting Render owner ID..."
-          OWNER_RESP=$(curl -s -H "Authorization: Bearer $RENDER_API_KEY" \
-            -H "Accept: application/json" \
+          # Get owner ID
+          OWNER=$(curl -sf -H "Authorization: Bearer $KEY" \
             "https://api.render.com/v1/owners?limit=1")
-          OWNER_ID=$(echo "$OWNER_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['owner']['id'])" 2>/dev/null)
+          echo "Owner response: $OWNER"
+          OWNER_ID=$(echo "$OWNER" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['owner']['id'])")
           echo "Owner ID: $OWNER_ID"
 
-          echo "Checking if service exists..."
-          SERVICES=$(curl -s -H "Authorization: Bearer $RENDER_API_KEY" \
-            -H "Accept: application/json" \
+          # List existing services
+          SERVICES=$(curl -sf -H "Authorization: Bearer $KEY" \
             "https://api.render.com/v1/services?limit=20")
           echo "Services: $SERVICES"
 
-          EXISTING=$(echo "$SERVICES" | python3 -c "
-          import sys, json
-          services = json.load(sys.stdin)
-          for s in services:
-            srv = s.get('service', {})
-            if srv.get('name') == 'skymaxx-lead-engine':
-              print(srv.get('id',''))
-              break
-          " 2>/dev/null)
+          # Check if our service exists
+          SVC_ID=$(echo "$SERVICES" | python3 -c "
+import sys,json
+svcs = json.load(sys.stdin)
+for s in svcs:
+    if s.get('service',{}).get('name') == 'skymaxx-lead-engine':
+        print(s['service']['id'])
+        break
+" 2>/dev/null || echo "")
 
-          SERVICE_URL=""
-
-          if [ -n "$EXISTING" ]; then
-            echo "Service exists: $EXISTING"
-            SERVICE_URL=$(curl -s -H "Authorization: Bearer $RENDER_API_KEY" \
-              "https://api.render.com/v1/services/$EXISTING" | \
-              python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('service',{}).get('serviceDetails',{}).get('url',''))" 2>/dev/null)
-            curl -s -X POST \
-              -H "Authorization: Bearer $RENDER_API_KEY" \
-              "https://api.render.com/v1/services/$EXISTING/deploys" -d '{}'
-            echo "Redeployed existing service"
+          if [ -n "$SVC_ID" ]; then
+            echo "Service exists: $SVC_ID — redeploying..."
+            curl -sf -X POST -H "Authorization: Bearer $KEY" \
+              "https://api.render.com/v1/services/$SVC_ID/deploys" \
+              -H "Content-Type: application/json" -d '{}'
+            SVC_URL=$(echo "$SERVICES" | python3 -c "
+import sys,json
+svcs = json.load(sys.stdin)
+for s in svcs:
+    if s.get('service',{}).get('name') == 'skymaxx-lead-engine':
+        print(s['service'].get('serviceDetails',{}).get('url','https://skymaxx-lead-engine.onrender.com'))
+        break
+")
           else
             echo "Creating new service..."
-            CREATE=$(curl -s -X POST \
-              -H "Authorization: Bearer $RENDER_API_KEY" \
+            PAYLOAD=$(python3 -c "
+import json
+d = {
+  'type': 'web_service',
+  'name': 'skymaxx-lead-engine',
+  'ownerId': '$OWNER_ID',
+  'repo': 'https://github.com/tkpthalayck/skymaxx-lead-engine',
+  'branch': 'main',
+  'autoDeploy': 'yes',
+  'serviceDetails': {
+    'runtime': 'python',
+    'buildCommand': 'pip install -r requirements.txt',
+    'startCommand': 'gunicorn app:app --bind 0.0.0.0:\$PORT --workers 2 --timeout 120',
+    'plan': 'free',
+    'region': 'oregon',
+    'envVars': [
+      {'key': 'GOOGLE_MAPS_API_KEY', 'value': '${{ secrets.GOOGLE_MAPS_API_KEY }}'},
+      {'key': 'ZEPTO_TOKEN',         'value': '${{ secrets.ZEPTO_TOKEN }}'},
+      {'key': 'FROM_EMAIL',          'value': 'support@skymaxx.company'},
+      {'key': 'FROM_NAME',           'value': 'Ali | SKYMAXX IT Solutions'},
+      {'key': 'DB_PATH',             'value': 'skymaxx.db'}
+    ]
+  }
+}
+print(json.dumps(d))
+")
+            CREATE=$(curl -sf -X POST \
+              -H "Authorization: Bearer $KEY" \
               -H "Content-Type: application/json" \
               "https://api.render.com/v1/services" \
-              -d "{
-                \"type\": \"web_service\",
-                \"name\": \"skymaxx-lead-engine\",
-                \"ownerId\": \"$OWNER_ID\",
-                \"repo\": \"https://github.com/tkpthalayck/skymaxx-lead-engine\",
-                \"branch\": \"main\",
-                \"autoDeploy\": \"yes\",
-                \"serviceDetails\": {
-                  \"runtime\": \"python\",
-                  \"buildCommand\": \"pip install -r requirements.txt\",
-                  \"startCommand\": \"gunicorn app:app --bind 0.0.0.0:\$PORT --workers 2 --timeout 120\",
-                  \"plan\": \"free\",
-                  \"region\": \"oregon\",
-                  \"envVars\": [
-                    {\"key\": \"GOOGLE_MAPS_API_KEY\", \"value\": \"${{ secrets.GOOGLE_MAPS_API_KEY }}\"},
-                    {\"key\": \"ZEPTO_TOKEN\",         \"value\": \"${{ secrets.ZEPTO_TOKEN }}\"},
-                    {\"key\": \"FROM_EMAIL\",          \"value\": \"support@skymaxx.company\"},
-                    {\"key\": \"FROM_NAME\",           \"value\": \"Ali | SKYMAXX IT Solutions\"},
-                    {\"key\": \"DB_PATH\",             \"value\": \"/var/data/skymaxx.db\"}
-                  ]
-                }
-              }")
+              -d "$PAYLOAD")
             echo "Create response: $CREATE"
-            SERVICE_ID=$(echo "$CREATE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('service',{}).get('id',''))" 2>/dev/null)
-            SERVICE_URL=$(echo "$CREATE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('service',{}).get('serviceDetails',{}).get('url',''))" 2>/dev/null)
-            echo "Created service ID: $SERVICE_ID"
+            SVC_ID=$(echo "$CREATE" | python3 -c "import sys,json; print(json.load(sys.stdin)['service']['id'])")
+            SVC_URL=$(echo "$CREATE" | python3 -c "import sys,json; print(json.load(sys.stdin)['service'].get('serviceDetails',{}).get('url','https://skymaxx-lead-engine.onrender.com'))")
+            echo "Created service: $SVC_ID"
           fi
 
-          echo "LIVE_URL=$SERVICE_URL" >> $GITHUB_ENV
-          echo "Service URL: $SERVICE_URL"
+          echo "SERVICE_URL=$SVC_URL" >> $GITHUB_OUTPUT
+          echo "SERVICE_ID=$SVC_ID"   >> $GITHUB_OUTPUT
+          echo "Live URL: $SVC_URL"
 
-      - name: Write live URL to repo
+      - name: Save URL to file
         run: |
-          echo "https://skymaxx-lead-engine.onrender.com" > LIVE_URL.txt
-          if [ -n "$LIVE_URL" ]; then
-            echo "$LIVE_URL" > LIVE_URL.txt
+          URL="${{ steps.render.outputs.SERVICE_URL }}"
+          if [ -z "$URL" ]; then
+            URL="https://skymaxx-lead-engine.onrender.com"
           fi
-          cat LIVE_URL.txt
+          echo "$URL" > LIVE_URL.txt
+          echo "Saved: $URL"
 
-      - name: Commit URL file
+      - name: Commit LIVE_URL
         run: |
-          git config user.email "support@royalgroups.store"
-          git config user.name "SKYMAXX Deploy Bot"
+          git config user.email "bot@skymaxx.company"
+          git config user.name "SKYMAXX Bot"
           git add LIVE_URL.txt
-          git diff --staged --quiet || git commit -m "Update live URL"
-          git push || true
+          git diff --staged --quiet || git commit -m "chore: save live URL [skip ci]"
+          git push
