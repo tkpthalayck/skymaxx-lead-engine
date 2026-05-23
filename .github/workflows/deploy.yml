@@ -15,71 +15,14 @@ jobs:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
           ZEPTO_TOKEN: ${{ secrets.ZEPTO_TOKEN }}
-        run: |
-          cat > payload.json << 'JSONEOF'
-          {
-            "type": "web_service",
-            "name": "skymaxx-lead-engine",
-            "ownerId": "tea-d88q6frbc2fs73eh5rmg",
-            "repo": "https://github.com/tkpthalayck/skymaxx-lead-engine",
-            "branch": "main",
-            "autoDeploy": "yes",
-            "serviceDetails": {
-              "runtime": "python",
-              "buildCommand": "pip install -r requirements.txt",
-              "startCommand": "gunicorn app:app --bind 0.0.0.0: --workers 2 --timeout 120",
-              "plan": "free",
-              "region": "oregon",
-              "envVars": [
-                {"key": "GOOGLE_MAPS_API_KEY", "value": "MAPS_PLACEHOLDER"},
-                {"key": "ZEPTO_TOKEN",         "value": "ZEPTO_PLACEHOLDER"},
-                {"key": "FROM_EMAIL",          "value": "support@skymaxx.company"},
-                {"key": "FROM_NAME",           "value": "Ali | SKYMAXX IT Solutions"},
-                {"key": "DB_PATH",             "value": "skymaxx.db"}
-              ]
-            }
-          }
-          JSONEOF
-          
-          # Replace placeholders with actual secrets
-          python3 -c "
-import json, os
-with open('payload.json') as f:
-    content = f.read().strip()
-data = json.loads(content)
-envvars = data['serviceDetails']['envVars']
-for e in envvars:
-    if e['key'] == 'GOOGLE_MAPS_API_KEY': e['value'] = os.environ['GOOGLE_MAPS_API_KEY']
-    if e['key'] == 'ZEPTO_TOKEN': e['value'] = os.environ['ZEPTO_TOKEN']
-with open('payload.json','w') as f:
-    json.dump(data, f)
-print('Payload ready')
-"
-          
-          echo "Creating service..."
-          curl -s -X POST             -H "Authorization: Bearer "             -H "Content-Type: application/json"             -H "Accept: application/json"             "https://api.render.com/v1/services"             --data @payload.json > create_result.json
-          
-          cat create_result.json
-          
-          # Extract URL
-          python3 -c "
-import json
-with open('create_result.json') as f:
-    d = json.load(f)
-svc = d.get('service', d)
-sid = svc.get('id','?')
-url = svc.get('serviceDetails',{}).get('url', 'https://skymaxx-lead-engine.onrender.com')
-print(f'Service ID: {sid}')
-print(f'URL: {url}')
-with open('LIVE_URL.txt','w') as f:
-    f.write(url)
-"
+        run: python3 create_render.py
 
-      - name: Commit live URL
+      - name: Commit results
         if: always()
         run: |
           git config user.email "bot@skymaxx.company"
           git config user.name "Bot"
-          git add -f LIVE_URL.txt create_result.json
-          git commit -m "live url [skip ci]" || true
-          git push || true
+          git add -f deploy_debug.txt LIVE_URL.txt
+          git status
+          git commit -m "deploy results [skip ci]"
+          git push
