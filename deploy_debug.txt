@@ -1,3 +1,33 @@
-[{"cursor":"_1AzkiB1qCQ2ZnJiYzJmczczZWg1cm1n","owner":{"email":"ali.shakeer@gmail.com","id":"tea-d88q6frbc2fs73eh5rmg","name":"Shakeer's workspace","type":"team"}}]
-
-[]
+key_len=32
+OK GET /owners?limit=1
+owners=[{"cursor": "_1AzkiB1qCQ2ZnJiYzJmczczZWg1cm1n", "owner": {"email": "ali.shakeer@gmail.com", "id": "tea-d88q6frbc2fs73eh5rmg", "name": "Shakeer's workspace", "type": "team"}}]
+owner_id=tea-d88q6frbc2fs73eh5rmg
+OK GET /services?limit=20
+services_count=0
+creating service...
+ERR POST /services HTTP 429: {"error": "rate limit exceeded"}
+EXCEPTION: Traceback (most recent call last):
+  File "/home/runner/work/skymaxx-lead-engine/skymaxx-lead-engine/create_render.py", line 75, in <module>
+    result = api("POST", "/services", payload)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/skymaxx-lead-engine/skymaxx-lead-engine/create_render.py", line 18, in api
+    resp = urllib.request.urlopen(req, timeout=30)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 521, in open
+    response = meth(req, response)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 630, in http_response
+    response = self.parent.error(
+               ^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 559, in error
+    return self._call_chain(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 639, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 429: Too Many Requests
