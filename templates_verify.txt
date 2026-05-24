@@ -1,0 +1,41 @@
+=== LIVE TEMPLATES (5 emails) ===
+
+Step 1: Initial Outreach
+  Subject: Quick question about your Office 365 environment
+  Day +0
+  Body length: 3755 chars
+  Fabricated claims: NONE OK
+  Has SKYMAXX Technologies: YES
+  Has support@skymaxx: YES
+
+Step 2: Follow-up
+  Subject: Re: Microsoft 365 Support
+  Day +3
+  Body length: 5151 chars
+  Fabricated claims: NONE OK
+  Has SKYMAXX Technologies: YES
+  Has support@skymaxx: YES
+
+Step 3: Problem-Focused
+  Subject: Is your Microsoft 365 environment fully protected?
+  Day +7
+  Body length: 4318 chars
+  Fabricated claims: NONE OK
+  Has SKYMAXX Technologies: YES
+  Has support@skymaxx: YES
+
+Step 4: Value Follow-up
+  Subject: Additional Microsoft 365 support when needed
+  Day +14
+  Body length: 4853 chars
+  Fabricated claims: NONE OK
+  Has SKYMAXX Technologies: YES
+  Has support@skymaxx: YES
+
+Step 5: Breakup
+  Subject: Should I close the file?
+  Day +21
+  Body length: 3219 chars
+  Fabricated claims: NONE OK
+  Has SKYMAXX Technologies: YES
+  Has support@skymaxx: YES
