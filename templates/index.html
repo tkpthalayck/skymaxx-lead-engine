@@ -771,6 +771,8 @@ async function loadConfig() {
 
 // ─── SEQUENCE OVERVIEW (Dashboard) ───
 function renderSequenceOverview() {
+  
+  if (!document.getElementById('seq-overview')) return;
   const days = [0, 3, 7, 14, 21];
   document.getElementById('seq-overview').innerHTML = templates.map((t, i) => `
     <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-top:${i===0?'none':'1px solid var(--border)'}">
@@ -787,6 +789,8 @@ function renderSequenceOverview() {
 
 // ─── SEQUENCE CARDS (full preview) ───
 function renderSequenceCards() {
+  
+  if (!document.getElementById('sequence-cards')) return;
   const days = [0, 3, 7, 14, 21];
   document.getElementById('sequence-cards').innerHTML = templates.map((t, i) => `
     <div class="email-card">
@@ -871,12 +875,16 @@ async function loadQueue() {
 
 // ─── FIND LEADS — CATEGORY/CITY GRID ───
 function renderCategoriesGrid() {
+  
+  if (!document.getElementById('categories-grid')) return;
   document.getElementById('categories-grid').innerHTML = prospectingTemplates.map(t =>
     `<span class="chip" onclick="toggleCategory('${t.keyword.replace(/'/g,"\\\\'")}', this)">${t.label}</span>`
   ).join('');
 }
 
 function renderCitiesGrid() {
+  
+  if (!document.getElementById('cities-grid')) return;
   document.getElementById('cities-grid').innerHTML = citiesList.map(c =>
     `<span class="chip" onclick="toggleCity('${c.replace(/'/g,"\\\\'")}', this)">${c}</span>`
   ).join('');
@@ -1141,6 +1149,106 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
+
+
+// ─────────────────────────────────────────────
+// MISSING SEARCH HELPERS (declarations + render + toggle helpers)
+// These were intended to be loaded earlier but the earlier insertion was skipped.
+// ─────────────────────────────────────────────
+if (typeof qsResults === 'undefined') { window.qsResults = []; }
+if (typeof qsSelected === 'undefined') { window.qsSelected = new Set(); }
+
+function renderQSResults() {
+  const div = document.getElementById('qs-results');
+  if (!div) return;
+  if (!qsResults || !qsResults.length) {
+    div.innerHTML = '<div class="empty"><i class="fas fa-search"></i><p>No results</p></div>';
+    updateQSCount(); return;
+  }
+  div.innerHTML = qsResults.map(r => {
+    const isSel = qsSelected.has(r.place_id);
+    const sel = isSel ? 'selected' : '';
+    const already = r.already_saved ? 'already' : '';
+    const webShort = r.website ? r.website.replace(/^https?:\/\//,'').slice(0,30) : '';
+    return '<div class="search-result ' + sel + ' ' + already + '" id="qsr-' + r.place_id + '">' +
+      '<input type="checkbox"' + (isSel?' checked':'') + (r.already_saved?' disabled':'') + ' onchange="qsToggle(\'' + r.place_id + '\', this)"/>' +
+      '<div class="sr-info">' +
+        '<div class="name">' + escapeHtml(r.name) + '</div>' +
+        '<div class="meta">' +
+          (r.email ? '<span><i class="fas fa-envelope"></i>' + r.email + '</span>' : '<span style="color:var(--red)"><i class="fas fa-envelope-open"></i>no email</span>') +
+          (r.phone ? '<span><i class="fas fa-phone"></i>' + r.phone + '</span>' : '') +
+          (r.website ? '<span><i class="fas fa-globe"></i><a href="' + r.website + '" target="_blank" style="color:var(--accent2);text-decoration:none">' + webShort + '</a></span>' : '') +
+          (r.rating ? '<span><i class="fas fa-star" style="color:#f59e0b"></i>' + r.rating + ' (' + r.reviews + ')</span>' : '') +
+          (r.address ? '<span><i class="fas fa-map-marker-alt"></i>' + escapeHtml(String(r.address).slice(0,60)) + '</span>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="sr-actions">' +
+        (r.already_saved ? '<span class="badge badge-done">Already saved</span>' : '') +
+        (r.maps_url ? '<a href="' + r.maps_url + '" target="_blank" class="btn btn-outline btn-xs"><i class="fas fa-map"></i></a>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+  updateQSCount();
+}
+
+function qsToggle(pid, chk) {
+  if (chk.checked) qsSelected.add(pid); else qsSelected.delete(pid);
+  const el = document.getElementById('qsr-' + pid);
+  if (el) el.classList.toggle('selected', chk.checked);
+  updateQSCount();
+}
+
+function updateQSCount() {
+  const el = document.getElementById('qs-count');
+  if (el) el.textContent = qsSelected.size + ' selected of ' + (qsResults ? qsResults.length : 0);
+}
+
+function qsSelectAll(on) {
+  qsSelected.clear();
+  if (on && qsResults) qsResults.filter(r => !r.already_saved).forEach(r => qsSelected.add(r.place_id));
+  renderQSResults();
+}
+
+function qsSelectWithEmail() {
+  qsSelected.clear();
+  if (qsResults) qsResults.filter(r => r.has_email && !r.already_saved).forEach(r => qsSelected.add(r.place_id));
+  renderQSResults();
+}
+
+async function qsAddToGroup() {
+  if (!qsSelected.size) { alert('Select at least one lead'); return; }
+  const groups = await fetch('/api/groups').then(r=>r.json());
+  if (!groups.groups || !groups.groups.length) {
+    if (confirm('No contact groups yet. Create one now?')) {
+      if (typeof newGroup === 'function') { await newGroup(); return qsAddToGroup(); }
+    }
+    return;
+  }
+  const gid = prompt('Add to which group?\n\n' + groups.groups.map(g => g.id + ': ' + g.name + ' (' + g.lead_count + ' leads)').join('\n') + '\n\nEnter group ID:');
+  if (!gid) return;
+  const selected = qsResults.filter(r => qsSelected.has(r.place_id));
+  const r1 = await fetch('/api/search/v2/save_selected', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({leads: selected})
+  }).then(r=>r.json());
+  if (r1.error) { alert(r1.error); return; }
+  const r2 = await fetch('/api/groups/' + gid + '/add', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({lead_ids: r1.lead_ids})
+  }).then(r=>r.json());
+  alert('Saved ' + r1.saved + ' leads, added ' + (r2.added || 0) + ' to group.');
+  qsSelected.clear();
+  selected.forEach(s => { const f = qsResults.find(x => x.place_id === s.place_id); if (f) f.already_saved = true; });
+  renderQSResults();
+}
+
+// Defensive: ensure escapeHtml exists
+if (typeof escapeHtml !== 'function') {
+  window.escapeHtml = function(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  };
+}
 
 // ─────────────────────────────────────────────
 // HIERARCHICAL SEARCH v2 (Country/State/Category/Title)
