@@ -38,6 +38,125 @@ UAE_GCC_CITIES = [
     "Doha, Qatar", "Kuwait City, Kuwait", "Muscat, Oman", "Manama, Bahrain"
 ]
 
+# Hierarchical geography: Country → States/Regions
+COUNTRIES = [
+    # GCC & MENA - primary market
+    {"code": "AE", "name": "United Arab Emirates", "region": "GCC"},
+    {"code": "SA", "name": "Saudi Arabia",         "region": "GCC"},
+    {"code": "QA", "name": "Qatar",                "region": "GCC"},
+    {"code": "KW", "name": "Kuwait",               "region": "GCC"},
+    {"code": "OM", "name": "Oman",                 "region": "GCC"},
+    {"code": "BH", "name": "Bahrain",              "region": "GCC"},
+    {"code": "EG", "name": "Egypt",                "region": "MENA"},
+    {"code": "JO", "name": "Jordan",               "region": "MENA"},
+    {"code": "LB", "name": "Lebanon",              "region": "MENA"},
+    {"code": "TR", "name": "Turkey",               "region": "MENA"},
+    {"code": "MA", "name": "Morocco",              "region": "MENA"},
+    # Asia
+    {"code": "IN", "name": "India",                "region": "Asia"},
+    {"code": "PK", "name": "Pakistan",             "region": "Asia"},
+    {"code": "SG", "name": "Singapore",            "region": "Asia"},
+    {"code": "MY", "name": "Malaysia",             "region": "Asia"},
+    {"code": "PH", "name": "Philippines",          "region": "Asia"},
+    # Global
+    {"code": "US", "name": "United States",        "region": "Americas"},
+    {"code": "CA", "name": "Canada",               "region": "Americas"},
+    {"code": "GB", "name": "United Kingdom",       "region": "Europe"},
+    {"code": "DE", "name": "Germany",              "region": "Europe"},
+    {"code": "FR", "name": "France",               "region": "Europe"},
+    {"code": "AU", "name": "Australia",            "region": "Oceania"},
+]
+
+# States/Regions per country
+COUNTRY_STATES = {
+    "AE": ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Umm Al Quwain", "Fujairah"],
+    "SA": ["Riyadh", "Mecca (Jeddah)", "Eastern Province (Dammam)", "Medina", "Asir (Abha)",
+           "Tabuk", "Ha'il", "Northern Borders (Arar)", "Jazan", "Najran", "Al-Bahah", "Al-Jouf", "Qassim"],
+    "QA": ["Doha", "Al Rayyan", "Al Wakrah", "Al Khor"],
+    "KW": ["Kuwait City", "Hawalli", "Al Farwaniyah", "Al Ahmadi"],
+    "OM": ["Muscat", "Salalah", "Sohar", "Nizwa", "Sur"],
+    "BH": ["Manama", "Muharraq", "Riffa"],
+    "EG": ["Cairo", "Alexandria", "Giza", "Sharm El Sheikh", "Hurghada"],
+    "JO": ["Amman", "Zarqa", "Irbid", "Aqaba"],
+    "LB": ["Beirut", "Tripoli", "Sidon"],
+    "TR": ["Istanbul", "Ankara", "Izmir", "Bursa", "Antalya"],
+    "MA": ["Casablanca", "Rabat", "Marrakesh", "Tangier"],
+    "IN": ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Kolkata", "Pune", "Ahmedabad"],
+    "PK": ["Karachi", "Lahore", "Islamabad", "Rawalpindi"],
+    "SG": ["Singapore"],
+    "MY": ["Kuala Lumpur", "Penang", "Johor Bahru"],
+    "PH": ["Manila", "Cebu", "Davao"],
+    "US": ["California", "New York", "Texas", "Florida", "Illinois", "Pennsylvania", "Ohio",
+           "Georgia", "Massachusetts", "Washington", "Virginia", "Colorado", "Arizona", "Michigan",
+           "New Jersey", "North Carolina"],
+    "CA": ["Ontario", "British Columbia", "Quebec", "Alberta"],
+    "GB": ["London", "Manchester", "Birmingham", "Glasgow", "Edinburgh"],
+    "DE": ["Berlin", "Munich", "Hamburg", "Frankfurt", "Cologne"],
+    "FR": ["Paris", "Lyon", "Marseille"],
+    "AU": ["Sydney", "Melbourne", "Brisbane", "Perth"],
+}
+
+# Expanded Business Categories (matches user spec)
+BUSINESS_CATEGORIES = [
+    {"id": "real_estate",        "label": "Real Estate Agencies",    "keyword": "real estate agency"},
+    {"id": "hospitals",          "label": "Hospitals",                "keyword": "hospital"},
+    {"id": "medical_clinics",    "label": "Medical Clinics",          "keyword": "medical clinic"},
+    {"id": "dental_clinics",     "label": "Dental Clinics",           "keyword": "dental clinic"},
+    {"id": "construction",       "label": "Construction Companies",   "keyword": "construction company"},
+    {"id": "manufacturing",      "label": "Manufacturing Companies",  "keyword": "manufacturing company"},
+    {"id": "law_firms",          "label": "Law Firms",                "keyword": "law firm"},
+    {"id": "accounting",         "label": "Accounting Firms",         "keyword": "accounting firm"},
+    {"id": "insurance",          "label": "Insurance Companies",      "keyword": "insurance company"},
+    {"id": "retail",             "label": "Retail Stores",            "keyword": "retail store"},
+    {"id": "restaurants",        "label": "Restaurants",              "keyword": "restaurant"},
+    {"id": "hotels",             "label": "Hotels",                   "keyword": "hotel"},
+    {"id": "logistics",          "label": "Logistics Companies",      "keyword": "logistics company"},
+    {"id": "transportation",     "label": "Transportation Companies", "keyword": "transportation company"},
+    {"id": "it_companies",       "label": "IT Companies",             "keyword": "IT services company"},
+    {"id": "software",           "label": "Software Companies",       "keyword": "software development company"},
+    {"id": "marketing",          "label": "Marketing Agencies",       "keyword": "digital marketing agency"},
+    {"id": "education",          "label": "Educational Institutions", "keyword": "training institute"},
+    {"id": "govt_contractors",   "label": "Government Contractors",   "keyword": "government contractor"},
+    {"id": "engineering",        "label": "Engineering Firms",        "keyword": "engineering consultancy"},
+    {"id": "financial",          "label": "Financial Services",       "keyword": "financial services"},
+    {"id": "healthcare",         "label": "Healthcare Providers",     "keyword": "healthcare provider"},
+    {"id": "consulting",         "label": "Consulting Firms",         "keyword": "business consulting firm"},
+    {"id": "automotive",         "label": "Automotive",               "keyword": "auto dealership"},
+    {"id": "trading",            "label": "Trading Companies",        "keyword": "trading company"},
+    {"id": "fitness",            "label": "Fitness Centers",          "keyword": "fitness gym"},
+    {"id": "beauty",             "label": "Beauty & Wellness",        "keyword": "beauty salon spa"},
+    {"id": "advertising",        "label": "Advertising Agencies",     "keyword": "advertising agency"},
+    {"id": "interior_design",    "label": "Interior Designers",       "keyword": "interior design firm"},
+    {"id": "event_planning",     "label": "Event Planning",           "keyword": "event management company"},
+]
+
+# Job Title suggestions (used as KEYWORD modifier in Google Maps search,
+# OR for filtering after B2B database integration)
+JOB_TITLES = [
+    {"id": "founder",            "label": "Founder",                  "keyword": "founder"},
+    {"id": "cofounder",          "label": "Co-Founder",               "keyword": "co-founder"},
+    {"id": "ceo",                "label": "CEO",                      "keyword": "CEO"},
+    {"id": "managing_director",  "label": "Managing Director",        "keyword": "managing director"},
+    {"id": "owner",              "label": "Owner",                    "keyword": "owner"},
+    {"id": "president",          "label": "President",                "keyword": "president"},
+    {"id": "partner",            "label": "Partner",                  "keyword": "partner"},
+    {"id": "general_manager",    "label": "General Manager",          "keyword": "general manager"},
+    {"id": "operations_manager", "label": "Operations Manager",       "keyword": "operations manager"},
+    {"id": "it_manager",         "label": "IT Manager",               "keyword": "IT manager"},
+    {"id": "it_director",        "label": "IT Director",              "keyword": "IT director"},
+    {"id": "cto",                "label": "CTO",                      "keyword": "CTO"},
+    {"id": "cio",                "label": "CIO",                      "keyword": "CIO"},
+    {"id": "ciso",               "label": "CISO",                     "keyword": "CISO"},
+    {"id": "procurement_mgr",    "label": "Procurement Manager",      "keyword": "procurement manager"},
+    {"id": "purchasing_mgr",     "label": "Purchasing Manager",       "keyword": "purchasing manager"},
+    {"id": "marketing_manager",  "label": "Marketing Manager",        "keyword": "marketing manager"},
+    {"id": "sales_director",     "label": "Sales Director",           "keyword": "sales director"},
+    {"id": "hr_manager",         "label": "HR Manager",               "keyword": "HR manager"},
+    {"id": "finance_manager",    "label": "Finance Manager",          "keyword": "finance manager"},
+    {"id": "cfo",                "label": "CFO",                      "keyword": "CFO"},
+    {"id": "bdm",                "label": "Business Development Mgr", "keyword": "business development manager"},
+]
+
 # ─────────────────────────────────────────────
 # 5-EMAIL SEQUENCE TEMPLATES
 # ─────────────────────────────────────────────
@@ -1649,6 +1768,306 @@ def analytics_by_step():
         })
     conn.close()
     return jsonify({"by_step": rows})
+
+
+
+# ─────────────────────────────────────────────
+# GEOGRAPHIC + INDUSTRY + TITLE DATA ENDPOINTS
+# ─────────────────────────────────────────────
+@app.route("/api/locations/countries")
+def locations_countries():
+    return jsonify(COUNTRIES)
+
+
+@app.route("/api/locations/states/<country_code>")
+def locations_states(country_code):
+    states = COUNTRY_STATES.get(country_code.upper(), [])
+    return jsonify(states)
+
+
+@app.route("/api/business_categories")
+def business_categories():
+    return jsonify(BUSINESS_CATEGORIES)
+
+
+@app.route("/api/job_titles")
+def job_titles_list():
+    return jsonify(JOB_TITLES)
+
+
+def _build_search_query(category, job_title, country, state, city):
+    """Construct an optimized Google Maps Places query string."""
+    parts = []
+    if job_title: parts.append(job_title)
+    if category:  parts.append(category)
+    location_parts = []
+    if city:    location_parts.append(city)
+    if state and state.lower() not in (city or "").lower(): location_parts.append(state)
+    if country: location_parts.append(country)
+    location = ", ".join(location_parts) if location_parts else ""
+    base = " ".join(p for p in parts if p)
+    if location:
+        return f"{base} in {location}".strip()
+    return base
+
+
+# ─────────────────────────────────────────────
+# ENHANCED SEARCH PREVIEW (hierarchical filters)
+# ─────────────────────────────────────────────
+@app.route("/api/search/v2/preview", methods=["POST"])
+def search_v2_preview():
+    """New search with full hierarchical filters: country, state, city, category, job title."""
+    data = request.json or {}
+    category   = (data.get("category")   or "").strip()
+    job_title  = (data.get("job_title")  or "").strip()
+    country    = (data.get("country")    or "").strip()
+    state      = (data.get("state")      or "").strip()
+    city       = (data.get("city")       or "").strip()
+    custom_kw  = (data.get("keyword")    or "").strip()
+
+    if not GOOGLE_MAPS_API_KEY:
+        return jsonify({"error": "Google Maps not configured"}), 400
+
+    # Build keyword: prefer custom keyword if provided, otherwise use category
+    keyword = custom_kw if custom_kw else category
+    if not keyword:
+        return jsonify({"error": "Please pick a Business Category or enter a custom keyword"}), 400
+    if not (country or state or city):
+        return jsonify({"error": "Please pick a Country, State, or City"}), 400
+
+    query = _build_search_query(keyword, job_title, country, state, city)
+
+    try:
+        resp = requests.get(PLACES_TEXT_URL, params={
+            "key": GOOGLE_MAPS_API_KEY, "query": query
+        }, timeout=15).json()
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    if resp.get("status") not in ("OK", "ZERO_RESULTS"):
+        return jsonify({"error": resp.get("error_message", resp.get("status"))}), 403
+
+    location_label = ", ".join(p for p in [city, state, country] if p)
+
+    results = []
+    for place in resp.get("results", [])[:20]:
+        pid = place.get("place_id", "")
+        try:
+            det = requests.get(PLACES_DETAIL_URL, params={
+                "key": GOOGLE_MAPS_API_KEY, "place_id": pid,
+                "fields": "name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,types"
+            }, timeout=10).json().get("result", {})
+        except Exception:
+            det = {}
+        time.sleep(0.3)
+        website = det.get("website", "") or ""
+        email = ""
+        if website:
+            domain = website.replace("https://","").replace("http://","").split("/")[0]
+            if domain.startswith("www."): domain = domain[4:]
+            email = f"info@{domain}"
+        results.append({
+            "place_id":   pid,
+            "name":       det.get("name") or place.get("name", ""),
+            "email":      email,
+            "phone":      det.get("formatted_phone_number", ""),
+            "website":    website,
+            "address":    det.get("formatted_address", ""),
+            "city":       city or state or country,
+            "country":    country or city.split(",")[-1].strip() if city else "",
+            "category":   category or ", ".join(place.get("types", [])[:3]),
+            "rating":     place.get("rating", 0),
+            "reviews":    place.get("user_ratings_total", 0),
+            "maps_url":   f"https://www.google.com/maps/place/?q=place_id:{pid}",
+            "has_email":  bool(email),
+        })
+
+    # Mark already-saved
+    if results:
+        place_ids = [r["place_id"] for r in results]
+        conn = get_db()
+        placeholders = ",".join("?" * len(place_ids))
+        existing = {r["place_id"] for r in conn.execute(
+            f"SELECT place_id FROM leads WHERE place_id IN ({placeholders})", place_ids).fetchall()}
+        conn.close()
+        for r in results:
+            r["already_saved"] = r["place_id"] in existing
+
+    return jsonify({
+        "results": results,
+        "found":   len(results),
+        "query":   query,
+        "location_label": location_label,
+        "note":    ("Job title filtering uses the title as a search keyword. "
+                    "For verified job-title-targeted prospect lists, a B2B database "
+                    "(Apollo, Vibe Prospecting, etc.) is recommended.") if job_title else None,
+    })
+
+
+# ─────────────────────────────────────────────
+# BULK MULTI-DIMENSIONAL SEARCH (preview, no save)
+# ─────────────────────────────────────────────
+@app.route("/api/search/v2/bulk_preview", methods=["POST"])
+def search_v2_bulk_preview():
+    """Bulk search: multiple countries × states × categories × job titles in one batch."""
+    data = request.json or {}
+    countries  = data.get("countries", [])
+    states     = data.get("states", [])
+    categories = data.get("categories", [])  # keyword strings, not IDs
+    titles     = data.get("job_titles", [])  # keyword strings, not IDs
+    if not GOOGLE_MAPS_API_KEY:
+        return jsonify({"error": "Google Maps not configured"}), 400
+    if not categories:
+        return jsonify({"error": "Pick at least 1 business category"}), 400
+    if not (countries or states):
+        return jsonify({"error": "Pick at least 1 country or state"}), 400
+
+    # Build search combinations (capped to prevent abuse)
+    title_combos = titles if titles else [""]
+    geo_combos = []
+    for c in (countries or [""]):
+        for s in (states or [""]):
+            if c or s:
+                geo_combos.append((c, s))
+    if not geo_combos:
+        geo_combos = [("", "")]
+
+    combinations = []
+    for cat in categories:
+        for jt in title_combos:
+            for (country, state) in geo_combos:
+                combinations.append({
+                    "category":  cat,
+                    "job_title": jt,
+                    "country":   country,
+                    "state":     state,
+                })
+    # Cap at 12 to avoid timeouts (12 × 10 results = 120 leads)
+    if len(combinations) > 12:
+        combinations = combinations[:12]
+        capped = True
+    else:
+        capped = False
+
+    all_results = []
+    summary = []
+    seen_pids = set()
+
+    for combo in combinations:
+        query = _build_search_query(combo["category"], combo["job_title"],
+                                    combo["country"], combo["state"], "")
+        try:
+            resp = requests.get(PLACES_TEXT_URL, params={
+                "key": GOOGLE_MAPS_API_KEY, "query": query
+            }, timeout=15).json()
+            if resp.get("status") not in ("OK", "ZERO_RESULTS"):
+                summary.append({**combo, "found": 0, "error": resp.get("status")})
+                continue
+            places = resp.get("results", [])[:8]
+            local_count = 0
+            for place in places:
+                pid = place.get("place_id", "")
+                if pid in seen_pids: continue
+                seen_pids.add(pid)
+                # Quick detail (skip on bulk for speed)
+                website = ""
+                email = ""
+                # Cheap fields directly from the search response
+                all_results.append({
+                    "place_id":  pid,
+                    "name":      place.get("name", ""),
+                    "email":     "",
+                    "phone":     "",
+                    "website":   "",
+                    "address":   place.get("formatted_address", ""),
+                    "city":      combo["state"] or combo["country"],
+                    "country":   combo["country"],
+                    "category":  combo["category"],
+                    "job_title": combo["job_title"],
+                    "rating":    place.get("rating", 0),
+                    "reviews":   place.get("user_ratings_total", 0),
+                    "maps_url":  f"https://www.google.com/maps/place/?q=place_id:{pid}",
+                    "has_email": False,
+                })
+                local_count += 1
+            summary.append({**combo, "found": local_count, "error": None})
+        except Exception as e:
+            summary.append({**combo, "found": 0, "error": str(e)[:80]})
+        time.sleep(0.2)
+
+    # Mark already saved
+    if all_results:
+        pids = [r["place_id"] for r in all_results]
+        conn = get_db()
+        placeholders = ",".join("?" * len(pids))
+        existing = {r["place_id"] for r in conn.execute(
+            f"SELECT place_id FROM leads WHERE place_id IN ({placeholders})", pids).fetchall()}
+        conn.close()
+        for r in all_results:
+            r["already_saved"] = r["place_id"] in existing
+
+    return jsonify({
+        "results":    all_results,
+        "found":      len(all_results),
+        "summary":    summary,
+        "capped":     capped,
+        "combinations_run": len(combinations),
+        "note":       "Bulk preview returns names and addresses only (fast). Full contact details will be fetched when you save selected leads.",
+    })
+
+
+# ─────────────────────────────────────────────
+# ENHANCE save_selected to fetch full details
+# ─────────────────────────────────────────────
+@app.route("/api/search/v2/save_selected", methods=["POST"])
+def search_v2_save_selected():
+    """Save selected leads. For bulk-preview results without details, fetches them now."""
+    data = request.json or {}
+    leads = data.get("leads", [])
+    if not leads: return jsonify({"error": "no leads"}), 400
+
+    conn = get_db()
+    saved = 0
+    saved_ids = []
+    needs_details = [l for l in leads if not l.get("email") and not l.get("phone") and l.get("place_id")]
+    detail_map = {}
+    # Fetch missing details in parallel (capped at 30)
+    for l in needs_details[:30]:
+        try:
+            det = requests.get(PLACES_DETAIL_URL, params={
+                "key": GOOGLE_MAPS_API_KEY, "place_id": l["place_id"],
+                "fields": "name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,types"
+            }, timeout=10).json().get("result", {})
+            time.sleep(0.25)
+            detail_map[l["place_id"]] = det
+        except Exception:
+            pass
+
+    for r in leads:
+        det = detail_map.get(r.get("place_id"), {})
+        website = r.get("website", "") or det.get("website", "") or ""
+        email = r.get("email", "") or ""
+        if not email and website:
+            domain = website.replace("https://","").replace("http://","").split("/")[0]
+            if domain.startswith("www."): domain = domain[4:]
+            email = f"info@{domain}"
+        phone = r.get("phone", "") or det.get("formatted_phone_number", "")
+        try:
+            cur = conn.execute("""INSERT OR IGNORE INTO leads
+                (name,email,phone,website,address,city,country,category,rating,reviews,place_id,maps_url,source,status)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'searched','new')""",
+                [r.get("name") or det.get("name", ""),
+                 email, phone, website,
+                 r.get("address") or det.get("formatted_address", ""),
+                 r.get("city",""), r.get("country",""),
+                 r.get("category",""), r.get("rating",0) or det.get("rating",0),
+                 r.get("reviews",0) or det.get("user_ratings_total",0),
+                 r.get("place_id",""), r.get("maps_url","")])
+            if cur.rowcount:
+                saved += 1
+                saved_ids.append(cur.lastrowid)
+        except Exception: pass
+    conn.commit(); conn.close()
+    return jsonify({"saved": saved, "lead_ids": saved_ids})
 
 
 # ── CONFIG STATUS ──
