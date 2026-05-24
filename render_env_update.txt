@@ -1,0 +1,4 @@
+=== Updating Render Env Vars ===
+Existing vars: 4
+Setting 9 total env vars
+  OK env vars updated (HTTP 200)
