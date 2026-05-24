@@ -1247,7 +1247,7 @@ async function enrichEmailsInBackground() {
   }
   showProgress();
 
-  const BATCH_SIZE = 6;
+  const BATCH_SIZE = 4;  // smaller batches to avoid 502 on free tier
   for (let i = 0; i < toEnrich.length; i += BATCH_SIZE) {
     const batch = toEnrich.slice(i, i + BATCH_SIZE).map(r => ({
       place_id: r.place_id,
