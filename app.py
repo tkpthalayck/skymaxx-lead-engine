@@ -2206,7 +2206,7 @@ def scrape_emails_from_website(website, per_url_timeout=4):
                 text = ""
             if not text: continue
             found = _EMAIL_RE.findall(text)
-            mailtos = _re.findall(r'mailto:([^"\'\s>?]+)', text)
+            mailtos = _re.findall(r"mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})", text)
             for e in mailtos + found:
                 ne = _normalize_email(e)
                 if _is_valid_email(ne) and ne not in all_emails:
@@ -2231,7 +2231,7 @@ def enrich_lead_with_email(lead):
     domain = website.replace('https://','').replace('http://','').split('/')[0]
     if domain.startswith('www.'): domain = domain[4:]
 
-    emails = scrape_emails_from_website(website, timeout=5)
+    emails = scrape_emails_from_website(website, per_url_timeout=4)
     best = _pick_best_email(emails, target_domain=domain)
     if best:
         lead['email'] = best
