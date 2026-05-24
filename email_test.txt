@@ -1,0 +1,6 @@
+=== EMAIL SCRAPING LIVE TEST ===
+
+Searching: IT companies in Dubai, UAE...
+(This will scrape websites for real emails — expect 20-40s)
+
+FAIL: HTTP 0 | {'error': 'HTTP Error 502: Bad Gateway'}
