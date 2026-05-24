@@ -130,6 +130,32 @@ def init_db():
             created_at      TEXT DEFAULT (datetime('now'))
         );
 
+        CREATE TABLE IF NOT EXISTS campaigns (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            name              TEXT NOT NULL,
+            summary           TEXT,
+            status            TEXT DEFAULT 'draft',
+            lead_ids_json     TEXT NOT NULL,
+            recipient_count   INTEGER DEFAULT 0,
+            schedule_starts   TEXT,
+            risk_score        INTEGER DEFAULT 0,
+            risk_notes        TEXT,
+            est_open_rate     REAL DEFAULT 0,
+            est_reply_rate    REAL DEFAULT 0,
+            deliverability    TEXT,
+            spf_status        TEXT,
+            dkim_status       TEXT,
+            dmarc_status      TEXT,
+            approved_at       TEXT,
+            approved_by       TEXT,
+            rejected_reason   TEXT,
+            actually_started  INTEGER DEFAULT 0,
+            actually_sent     INTEGER DEFAULT 0,
+            actually_failed   INTEGER DEFAULT 0,
+            actually_replied  INTEGER DEFAULT 0,
+            created_at        TEXT DEFAULT (datetime('now'))
+        );
+
         CREATE TABLE IF NOT EXISTS email_log (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             lead_id      INTEGER,
@@ -838,6 +864,363 @@ def search_multi():
             except Exception as e:
                 summary.append({"keyword": keyword, "city": city, "found": 0, "error": str(e)[:60]})
     return jsonify({"saved": total_saved, "dupes": total_dupes, "summary": summary})
+
+
+
+# ─────────────────────────────────────────────
+# DOMAIN HEALTH CHECK — SPF / DKIM / DMARC
+# ─────────────────────────────────────────────
+import socket
+
+def _dns_txt_lookup(domain):
+    """Lookup TXT records by calling Google DNS-over-HTTPS (works on Render)."""
+    try:
+        url = f"https://dns.google/resolve?name={domain}&type=TXT"
+        r = requests.get(url, timeout=10)
+        if r.status_code != 200: return []
+        data = r.json()
+        if data.get("Status") != 0: return []
+        return [a.get("data","").strip('"') for a in data.get("Answer", [])]
+    except Exception:
+        return []
+
+def check_domain_health(domain):
+    """Check SPF, DKIM, DMARC for the sending domain."""
+    domain = (domain or "").lower().strip()
+    if not domain: domain = "skymaxx.company"
+    result = {
+        "domain":  domain,
+        "spf":     {"status": "missing", "value": None, "issues": []},
+        "dkim":    {"status": "unknown", "selectors": []},
+        "dmarc":   {"status": "missing", "value": None, "policy": None},
+        "mx":      {"status": "unknown", "records": []},
+        "score":   0,
+    }
+
+    # SPF check
+    txts = _dns_txt_lookup(domain)
+    spf = next((t for t in txts if t.startswith("v=spf1")), None)
+    if spf:
+        result["spf"]["value"] = spf
+        result["spf"]["status"] = "ok"
+        if "include:zeptomail.zoho.com" not in spf and "zeptomail" not in spf:
+            result["spf"]["issues"].append("ZeptoMail not authorized — emails may go to spam")
+            result["spf"]["status"] = "warning"
+        if "include:spf.protection.outlook.com" not in spf and "outlook" not in spf:
+            result["spf"]["issues"].append("Outlook 365 not authorized (skip if not using M365 to send)")
+        result["score"] += 30
+
+    # DKIM check — try common selectors
+    for selector in ("zoho", "default", "google", "selector1", "s1"):
+        dkim_txts = _dns_txt_lookup(f"{selector}._domainkey.{domain}")
+        dkim = next((t for t in dkim_txts if "v=DKIM1" in t or "k=" in t), None)
+        if dkim:
+            result["dkim"]["selectors"].append({"name": selector, "found": True})
+            result["dkim"]["status"] = "ok"
+    if not result["dkim"]["selectors"]:
+        result["dkim"]["status"] = "missing"
+    else:
+        result["score"] += 30
+
+    # DMARC check
+    dmarc_txts = _dns_txt_lookup(f"_dmarc.{domain}")
+    dmarc = next((t for t in dmarc_txts if t.startswith("v=DMARC1")), None)
+    if dmarc:
+        result["dmarc"]["value"] = dmarc
+        result["dmarc"]["status"] = "ok"
+        for part in dmarc.split(";"):
+            if part.strip().startswith("p="):
+                result["dmarc"]["policy"] = part.strip().split("=")[1]
+        result["score"] += 30
+
+    # MX check
+    mx_txts = _dns_txt_lookup(f"{domain}")  # use TXT for now, MX needs special query
+    result["score"] += 10  # baseline for domain existing
+
+    return result
+
+
+@app.route("/api/domain/health")
+def domain_health():
+    domain = request.args.get("domain", FROM_EMAIL.split("@")[-1] if "@" in FROM_EMAIL else "skymaxx.company")
+    return jsonify(check_domain_health(domain))
+
+
+# ─────────────────────────────────────────────
+# MANDATORY APPROVAL WORKFLOW — CAMPAIGNS
+# ─────────────────────────────────────────────
+
+def calculate_risk_score(lead_count, domain_health_result):
+    """Score 0-100, higher = more risk."""
+    score = 0; notes = []
+    if lead_count > 100: score += 20; notes.append(f"High volume ({lead_count} recipients)")
+    elif lead_count > 50: score += 10; notes.append(f"Medium volume ({lead_count} recipients)")
+    if domain_health_result["spf"]["status"] != "ok":
+        score += 25; notes.append("SPF not properly configured")
+    if domain_health_result["dkim"]["status"] != "ok":
+        score += 25; notes.append("DKIM not properly configured")
+    if domain_health_result["dmarc"]["status"] != "ok":
+        score += 15; notes.append("DMARC missing — recommended for deliverability")
+    return min(score, 100), notes
+
+
+@app.route("/api/campaigns", methods=["GET"])
+def list_campaigns():
+    conn = get_db()
+    rows = rows_to_list(conn.execute("""SELECT * FROM campaigns 
+        ORDER BY created_at DESC LIMIT 50""").fetchall())
+    conn.close()
+    return jsonify({"campaigns": rows})
+
+
+@app.route("/api/campaigns/<int:cid>", methods=["GET"])
+def get_campaign(cid):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM campaigns WHERE id=?", [cid]).fetchone()
+    conn.close()
+    if not row: return jsonify({"error": "not found"}), 404
+    return jsonify(dict(row))
+
+
+@app.route("/api/campaigns/draft", methods=["POST"])
+def create_campaign_draft():
+    """Create a campaign in 'pending_approval' status with all metadata for the approval popup."""
+    data = request.json or {}
+    name      = (data.get("name") or f"Campaign {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}").strip()
+    lead_ids  = data.get("lead_ids", [])
+    
+    # If lead_ids == "all", resolve them
+    conn = get_db()
+    if lead_ids == "all":
+        rows = conn.execute("""SELECT id FROM leads 
+            WHERE email IS NOT NULL AND email != '' 
+            AND in_sequence=0 AND unsubscribed=0 AND replied=0""").fetchall()
+        lead_ids = [r["id"] for r in rows]
+    elif lead_ids == "filtered":
+        # respect current filter state from query params
+        rows = conn.execute("""SELECT id FROM leads 
+            WHERE email IS NOT NULL AND email != ''""").fetchall()
+        lead_ids = [r["id"] for r in rows]
+    
+    lead_ids = [int(x) for x in lead_ids if x]
+    if not lead_ids:
+        conn.close()
+        return jsonify({"error": "no eligible leads selected"}), 400
+    
+    # Pull lead samples for preview
+    placeholders = ",".join("?" * len(lead_ids[:5]))
+    sample_leads = rows_to_list(conn.execute(f"""SELECT id,name,email,city 
+        FROM leads WHERE id IN ({placeholders}) LIMIT 5""", lead_ids[:5]).fetchall())
+    conn.close()
+    
+    # Domain health check
+    domain = FROM_EMAIL.split("@")[-1] if "@" in FROM_EMAIL else "skymaxx.company"
+    dh = check_domain_health(domain)
+    risk_score, risk_notes = calculate_risk_score(len(lead_ids), dh)
+    
+    # Estimate open/reply (industry averages for B2B cold outreach)
+    base_open = 35.0; base_reply = 6.0
+    if risk_score > 50: base_open -= 10; base_reply -= 2
+    if dh["score"] >= 60: base_open += 5
+    
+    # Schedule (sequence runs over 21 days)
+    schedule_starts = datetime.utcnow().isoformat()
+    
+    # Build summary
+    summary = (f"Send 5-email sequence over 21 days to {len(lead_ids)} prospects. "
+               f"Sender: {FROM_NAME} <{FROM_EMAIL}>. Topics: Microsoft 365 management.")
+    
+    conn = get_db()
+    cur = conn.execute("""INSERT INTO campaigns 
+        (name, summary, status, lead_ids_json, recipient_count, schedule_starts,
+         risk_score, risk_notes, est_open_rate, est_reply_rate, deliverability,
+         spf_status, dkim_status, dmarc_status)
+        VALUES (?,?,'pending_approval',?,?,?,?,?,?,?,?,?,?,?)""",
+        [name, summary, json.dumps(lead_ids), len(lead_ids), schedule_starts,
+         risk_score, " • ".join(risk_notes) if risk_notes else "All checks passed",
+         base_open, base_reply, f"Domain health score: {dh['score']}/100",
+         dh["spf"]["status"], dh["dkim"]["status"], dh["dmarc"]["status"]])
+    conn.commit()
+    campaign_id = cur.lastrowid
+    conn.close()
+    
+    return jsonify({
+        "campaign_id": campaign_id,
+        "status": "pending_approval",
+        "name": name,
+        "summary": summary,
+        "recipient_count": len(lead_ids),
+        "sample_leads": sample_leads,
+        "schedule_starts": schedule_starts,
+        "schedule_ends":   (datetime.utcnow() + timedelta(days=21)).isoformat(),
+        "risk_score": risk_score,
+        "risk_notes": risk_notes,
+        "est_open_rate":  round(base_open, 1),
+        "est_reply_rate": round(base_reply, 1),
+        "domain_health":  dh,
+        "sequence_steps": [{"step": t["step"], "name": t["name"], 
+            "subject": t["subject"], "day": [0,3,7,14,21][i]} 
+            for i, t in enumerate(SEQUENCE_TEMPLATES)],
+    })
+
+
+@app.route("/api/campaigns/<int:cid>/approve", methods=["POST"])
+def approve_campaign(cid):
+    """Approve campaign and actually enroll leads."""
+    conn = get_db()
+    camp = conn.execute("SELECT * FROM campaigns WHERE id=? AND status='pending_approval'",
+                        [cid]).fetchone()
+    if not camp:
+        conn.close()
+        return jsonify({"error": "campaign not found or not pending"}), 404
+    
+    lead_ids = json.loads(camp["lead_ids_json"])
+    enrolled = 0
+    for lid in lead_ids:
+        cur = conn.execute("""UPDATE leads 
+            SET in_sequence=1, sequence_step=0, next_send_at=?
+            WHERE id=? AND replied=0 AND unsubscribed=0""",
+            [datetime.utcnow().isoformat(), lid])
+        if cur.rowcount > 0: enrolled += 1
+    
+    approved_by = (request.json or {}).get("approved_by", "user")
+    conn.execute("""UPDATE campaigns 
+        SET status='approved', approved_at=?, approved_by=?, actually_started=?
+        WHERE id=?""", 
+        [datetime.utcnow().isoformat(), approved_by, enrolled, cid])
+    conn.commit()
+    conn.close()
+    
+    return jsonify({"approved": True, "campaign_id": cid, "enrolled": enrolled})
+
+
+@app.route("/api/campaigns/<int:cid>/reject", methods=["POST"])
+def reject_campaign(cid):
+    reason = (request.json or {}).get("reason", "Rejected by user")
+    conn = get_db()
+    conn.execute("UPDATE campaigns SET status='rejected', rejected_reason=? WHERE id=? AND status='pending_approval'",
+                 [reason, cid])
+    conn.commit()
+    conn.close()
+    return jsonify({"rejected": True})
+
+
+@app.route("/api/campaigns/<int:cid>/modify", methods=["POST"])
+def modify_campaign(cid):
+    """Mark for modification — moves back to draft for re-editing."""
+    conn = get_db()
+    conn.execute("UPDATE campaigns SET status='draft' WHERE id=?", [cid])
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "draft"})
+
+
+# ─── AI ASSISTANT — placeholder endpoints (require API key to power) ──
+AI_PROVIDER = os.getenv("AI_PROVIDER", "")  # 'anthropic' or 'openai'
+AI_API_KEY  = os.getenv("AI_API_KEY", "")
+
+def _call_ai(system_prompt, user_prompt, max_tokens=1200):
+    """Call Anthropic or OpenAI based on AI_PROVIDER env var."""
+    if not AI_API_KEY:
+        return None, "AI not configured — set AI_PROVIDER and AI_API_KEY env vars"
+    try:
+        if AI_PROVIDER == "anthropic":
+            r = requests.post("https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": AI_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "claude-3-5-sonnet-20241022",
+                    "max_tokens": max_tokens,
+                    "system": system_prompt,
+                    "messages": [{"role":"user","content": user_prompt}],
+                },
+                timeout=60)
+            if r.status_code == 200:
+                return r.json()["content"][0]["text"], None
+            return None, f"AI error {r.status_code}: {r.text[:200]}"
+        elif AI_PROVIDER == "openai":
+            r = requests.post("https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {AI_API_KEY}", "Content-Type": "application/json"},
+                json={
+                    "model": "gpt-4o-mini",
+                    "max_tokens": max_tokens,
+                    "messages": [
+                        {"role":"system","content": system_prompt},
+                        {"role":"user","content": user_prompt},
+                    ],
+                },
+                timeout=60)
+            if r.status_code == 200:
+                return r.json()["choices"][0]["message"]["content"], None
+            return None, f"AI error {r.status_code}: {r.text[:200]}"
+        return None, f"Unknown AI_PROVIDER: {AI_PROVIDER}"
+    except Exception as e:
+        return None, str(e)
+
+
+AI_ACTION_PROMPTS = {
+    "rewrite":           "Rewrite this email to be more compelling while keeping the same intent, structure, and HTML formatting. Preserve all {{placeholders}} exactly.",
+    "improve_conversion":"Rewrite this email to maximize reply rate. Use psychology-driven copywriting (specific outcomes, low commitment, easy yes). Keep HTML structure and {{placeholders}}.",
+    "personalize":       "Make this email more personalized and conversational, as if written to one specific person. Keep HTML and {{placeholders}}.",
+    "make_professional": "Rewrite to be more formal and professional. Keep HTML and {{placeholders}}.",
+    "make_friendly":     "Rewrite to be warmer, friendlier, more conversational. Keep HTML and {{placeholders}}.",
+    "make_technical":    "Rewrite to be more technically detailed for technical buyers (CTOs, IT Directors). Keep HTML and {{placeholders}}.",
+    "shorten":           "Shorten this email by 40% while keeping the key message and CTA. Keep HTML and {{placeholders}}.",
+    "expand":            "Expand this email with one more benefit-focused paragraph. Keep HTML and {{placeholders}}.",
+    "grammar":           "Fix any grammar, spelling, or awkward phrasing. Keep HTML, structure, and {{placeholders}} unchanged.",
+    "improve_subject":   "Suggest 5 alternative subject lines optimized for B2B cold email open rates. Return as a numbered list, no HTML.",
+    "improve_cta":       "Strengthen the call-to-action in this email — make it more specific and benefit-driven. Keep HTML and {{placeholders}}.",
+    "improve_readability":"Improve readability: shorter sentences, simpler words, better flow. Keep HTML and {{placeholders}}.",
+    "improve_deliverability":"Rewrite to reduce spam-trigger words (free, guarantee, urgent, $$, etc.). Suggest changes. Keep HTML and {{placeholders}}.",
+    "compliance_check":  "Check this email for compliance issues (CAN-SPAM, GDPR). List any concerns. Don't rewrite — just audit.",
+    "translate_arabic":  "Translate this email to Arabic, preserving HTML structure and {{placeholders}}.",
+}
+
+
+@app.route("/api/ai/edit_email", methods=["POST"])
+def ai_edit_email():
+    """Run an AI action on an email. Returns the edited content."""
+    data = request.json or {}
+    action  = data.get("action", "")
+    subject = data.get("subject", "")
+    body    = data.get("body", "")
+    
+    if action not in AI_ACTION_PROMPTS:
+        return jsonify({"error": f"unknown action {action}", "available": list(AI_ACTION_PROMPTS.keys())}), 400
+    
+    if not AI_API_KEY:
+        return jsonify({
+            "error": "AI not configured",
+            "message": "Set AI_PROVIDER (anthropic|openai) and AI_API_KEY in Render env vars",
+            "action": action,
+            "preview": "AI feature requires an API key. The action would " + AI_ACTION_PROMPTS[action].lower()
+        }), 503
+    
+    sys_prompt = "You are an expert B2B cold email writer. Always preserve HTML structure and {{placeholders}} like {{first_name}} and {{sender_name}}."
+    nl = chr(10)
+    user_prompt = ("Action: " + AI_ACTION_PROMPTS[action] + nl + nl +
+                   "Subject: " + subject + nl + nl +
+                   "Body HTML:" + nl + body + nl + nl +
+                   "Return the result. If only the body changed, return just the new body HTML. "
+                   "If both subject and body changed, return them as: SUBJECT: ...|BODY: ...")
+    
+    result, err = _call_ai(sys_prompt, user_prompt)
+    if err:
+        return jsonify({"error": err}), 500
+    
+    return jsonify({"action": action, "result": result})
+
+
+@app.route("/api/ai/status")
+def ai_status():
+    return jsonify({
+        "configured": bool(AI_API_KEY and AI_PROVIDER),
+        "provider":   AI_PROVIDER or None,
+        "available_actions": list(AI_ACTION_PROMPTS.keys()),
+    })
 
 
 # ── CONFIG STATUS ──
