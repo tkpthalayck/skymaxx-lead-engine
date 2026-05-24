@@ -174,25 +174,25 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
 
   <div class="nav-section">
     <div class="nav-section-title">Overview</div>
-    <div class="nav-item active" onclick="tab('dashboard')"><i class="fas fa-chart-pie"></i> Dashboard</div>
+    <div class="nav-item active" onclick="tab('dashboard', this)"><i class="fas fa-chart-pie"></i> Dashboard</div>
   </div>
 
   <div class="nav-section">
     <div class="nav-section-title">Lead Generation</div>
-    <div class="nav-item" onclick="tab('search')"><i class="fas fa-search-location"></i> Find Leads</div>
-    <div class="nav-item" onclick="tab('leads')"><i class="fas fa-users"></i> All Leads <span id="nav-leads-count" class="nav-badge" style="display:none">0</span></div>
+    <div class="nav-item" onclick="tab('search', this)"><i class="fas fa-search-location"></i> Find Leads</div>
+    <div class="nav-item" onclick="tab('leads', this)"><i class="fas fa-users"></i> All Leads <span id="nav-leads-count" class="nav-badge" style="display:none">0</span></div>
   </div>
 
   <div class="nav-section">
     <div class="nav-section-title">Email Campaign</div>
-    <div class="nav-item" onclick="tab('sequence')"><i class="fas fa-stream"></i> Email Sequence</div>
-    <div class="nav-item" onclick="tab('sent')"><i class="fas fa-paper-plane"></i> Sent Emails</div>
-    <div class="nav-item" onclick="tab('replies')"><i class="fas fa-inbox"></i> Replies <span id="nav-replies-count" class="nav-badge" style="display:none">0</span></div>
+    <div class="nav-item" onclick="tab('sequence', this)"><i class="fas fa-stream"></i> Email Sequence</div>
+    <div class="nav-item" onclick="tab('sent', this)"><i class="fas fa-paper-plane"></i> Sent Emails</div>
+    <div class="nav-item" onclick="tab('replies', this)"><i class="fas fa-inbox"></i> Replies <span id="nav-replies-count" class="nav-badge" style="display:none">0</span></div>
   </div>
 
   <div class="nav-section">
     <div class="nav-section-title">Configuration</div>
-    <div class="nav-item" onclick="tab('settings')"><i class="fas fa-cog"></i> Settings</div>
+    <div class="nav-item" onclick="tab('settings', this)"><i class="fas fa-cog"></i> Settings</div>
   </div>
 
   <div style="position:absolute;bottom:14px;left:22px;font-size:11px;color:var(--muted)">
@@ -245,9 +245,9 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
           <i class="fas fa-bolt"></i> Quick Actions
         </div>
         <div class="flex gap-2" style="flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="tab('search')"><i class="fas fa-search"></i> Find New Leads</button>
-          <button class="btn btn-outline" onclick="tab('sequence')"><i class="fas fa-eye"></i> Preview Email Sequence</button>
-          <button class="btn btn-outline" onclick="tab('sent')"><i class="fas fa-paper-plane"></i> View Sent Emails</button>
+          <button class="btn btn-primary" onclick="tab('search', this)"><i class="fas fa-search"></i> Find New Leads</button>
+          <button class="btn btn-outline" onclick="tab('sequence', this)"><i class="fas fa-eye"></i> Preview Email Sequence</button>
+          <button class="btn btn-outline" onclick="tab('sent', this)"><i class="fas fa-paper-plane"></i> View Sent Emails</button>
           <button class="btn btn-outline" onclick="window.open('https://www.zoho.com/zeptomail/','_blank')"><i class="fas fa-external-link-alt"></i> ZeptoMail Dashboard</button>
         </div>
       </div>
@@ -503,11 +503,11 @@ async function init() {
   setInterval(loadStats, 30000);
 }
 
-function tab(name) {
+function tab(name, el) {
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
-  event && event.currentTarget && event.currentTarget.classList && event.currentTarget.classList.add('active');
+  if (el && el.classList) el.classList.add('active');
   const titles = {
     dashboard:['Dashboard','Live overview of your lead engine'],
     search:['Find Leads','Discover SMB businesses via Google Maps'],
@@ -519,13 +519,7 @@ function tab(name) {
   };
   document.getElementById('page-title').textContent = titles[name][0];
   document.getElementById('page-subtitle').textContent = titles[name][1];
-  // Update nav-item active state manually since event.target might not be the nav
-  const links = document.querySelectorAll('.nav-item');
-  for (const link of links) {
-    if (link.getAttribute('onclick') && link.getAttribute('onclick').includes("'"+name+"'")) {
-      link.classList.add('active');
-    }
-  }
+
   if (name==='sent') loadLog();
   if (name==='replies') loadReplies();
 }
@@ -562,7 +556,7 @@ async function loadConfig() {
     <div class="alert ${c.google_maps?'alert-success':'alert-error'}"><i class="fas fa-map"></i><div>Google Maps API: <strong>${c.google_maps?'Connected':'Not configured'}</strong></div></div>
     <div class="alert ${c.zepto_mail?'alert-success':'alert-error'}"><i class="fas fa-envelope"></i><div>ZeptoMail: <strong>${c.zepto_mail?'Connected':'Not configured'}</strong></div></div>
     <div class="alert ${c.graph_api?'alert-success':'alert-error'}"><i class="fas fa-reply"></i><div>Microsoft Graph (replies): <strong>${c.graph_api?`Monitoring ${c.mailbox}`:'Not configured'}</strong></div></div>
-    <div class="alert ${c.bcc_support?'alert-success':'alert-warn'}"><i class="fas fa-eye"></i><div>BCC to support inbox: <strong>${c.bcc_support?'Enabled — you\\'ll see emails in Outlook':'Disabled'}</strong></div></div>`;
+    <div class="alert ${c.bcc_support?'alert-success':'alert-warn'}"><i class="fas fa-eye"></i><div>BCC to support inbox: <strong>${c.bcc_support?'Enabled — you will see emails in Outlook':'Disabled'}</strong></div></div>`;
   document.getElementById('email-config').innerHTML = `
     <div style="font-size:13px;line-height:2">
       <strong>From Email:</strong> <code>${c.from_email}</code><br/>
@@ -604,7 +598,7 @@ function renderSequenceCards() {
         <div class="email-card-meta">${days[i]===0?'Sent on enrollment':'Day +'+days[i]}</div>
       </div>
       <div class="email-card-body">
-        ${t.body.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').slice(0,280)}...
+        ${t.body.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').slice(0,280)}...
       </div>
       <div class="email-card-actions">
         <button class="btn btn-outline btn-xs" onclick="previewTemplate(${t.step})"><i class="fas fa-eye"></i> Preview HTML</button>
@@ -809,7 +803,7 @@ async function loadLeads(page) {
       <td><input type="checkbox" class="chk" value="${l.id}" ${selected.has(l.id)?'checked':''} onchange="toggleSel(${l.id},this)"/></td>
       <td>
         <div style="font-weight:600;color:#fff">${escapeHtml(l.name||'?')}</div>
-        ${l.website?`<div style="font-size:11px"><a href="${l.website}" target="_blank" style="color:var(--accent2);text-decoration:none">${l.website.replace(/^https?:\\/\\//,'').slice(0,40)}</a></div>`:''}
+        ${l.website?`<div style="font-size:11px"><a href="${l.website}" target="_blank" style="color:var(--accent2);text-decoration:none">${l.website.replace(/^https?:\/\//,'').slice(0,40)}</a></div>`:''}
       </td>
       <td>
         ${l.email?`<div style="font-size:12px;color:var(--accent2)">${l.email}</div>`:'<span style="color:var(--muted)">—</span>'}
