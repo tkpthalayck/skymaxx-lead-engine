@@ -1,0 +1,26 @@
+=== Microsoft Graph API Test ===
+Tenant len: 36
+Client len: 36
+Secret len: 40
+Mailbox: support@skymaxx.company
+
+Step 1: Getting OAuth token...
+  OK token (len=2247)
+
+Step 2: Mailbox lookup...
+  OK None / None
+
+Step 3: Reading 10 most recent messages...
+  OK Found 10 messages
+  1. [NEW] 2026-05-24T03:09 | notifications@zohosocial.com | Hurray, your post is live now!
+  2. [NEW] 2026-05-24T03:09 | notifications@zohosocial.com | Hurray, your post is live now!
+  3. [NEW] 2026-05-24T03:06 | notifications@zohosocial.com | Hurray, your post is live now!
+  4. [NEW] 2026-05-24T03:06 | notifications@zohosocial.com | Hurray, your post is live now!
+  5. [NEW] 2026-05-24T03:03 | notifications@zohosocial.com | Yay, your post is live!
+  6. [NEW] 2026-05-24T03:03 | notifications@zohosocial.com | Yay, your post is live!
+  7. [NEW] 2026-05-24T03:00 | notifications@zohosocial.com | Hurray, your post is live now!
+  8. [NEW] 2026-05-24T03:00 | notifications@zohosocial.com | Hurray, your post is live now!
+  9. [NEW] 2026-05-24T02:57 | notifications@zohosocial.com | Hurray, your post is live now!
+  10. [NEW] 2026-05-24T02:57 | notifications@zohosocial.com | Success! Your post is live
+
+=== SUCCESS ===
