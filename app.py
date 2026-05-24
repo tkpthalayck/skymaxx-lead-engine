@@ -207,6 +207,196 @@ AUTO_REPLY_TEMPLATE = {
 # ─────────────────────────────────────────────
 # DATABASE
 # ─────────────────────────────────────────────
+
+# ════════════════════════════════════════════════════════════════════════
+# DATABASE ADAPTER — supports both SQLite (dev) and Postgres (production)
+# Set DATABASE_URL env var to switch to Postgres. Otherwise uses SQLite.
+# ════════════════════════════════════════════════════════════════════════
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+USE_POSTGRES = bool(DATABASE_URL and DATABASE_URL.startswith("postgresql://"))
+
+try:
+    if USE_POSTGRES:
+        import psycopg2
+        import psycopg2.extras
+except ImportError:
+    print("[WARN] psycopg2 not installed — falling back to SQLite")
+    USE_POSTGRES = False
+
+
+class _Row(dict):
+    """Dict-like row that supports both row[\'col\'] and row[0]."""
+    def __init__(self, columns, values):
+        if columns and values is not None:
+            for i, c in enumerate(columns):
+                dict.__setitem__(self, c, values[i])
+        self._values = tuple(values) if values is not None else ()
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._values[key]
+        return dict.__getitem__(self, key)
+
+
+class _PGCursor:
+    def __init__(self, raw_cur, lastrowid=None):
+        self._cur = raw_cur
+        self.lastrowid = lastrowid
+        try: self.rowcount = raw_cur.rowcount
+        except Exception: self.rowcount = 0
+        try: self._cols = [d[0] for d in raw_cur.description] if raw_cur.description else None
+        except Exception: self._cols = None
+    def fetchone(self):
+        try: row = self._cur.fetchone()
+        except Exception: return None
+        if row is None: return None
+        return _Row(self._cols, row)
+    def fetchall(self):
+        try: rows = self._cur.fetchall()
+        except Exception: return []
+        return [_Row(self._cols, r) for r in rows]
+
+
+def _translate_to_pg(sql):
+    sql = sql.replace("?", "%s")
+    sql = sql.replace("INSERT OR IGNORE INTO", "INSERT INTO")
+    sql = sql.replace("INSERT OR REPLACE INTO", "INSERT INTO")
+    sql = sql.replace("datetime(\'now\')", "CURRENT_TIMESTAMP")
+    sql = sql.replace("date(\'now\')", "CURRENT_DATE")
+    sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+    return sql
+
+
+class _PGConn:
+    def __init__(self, conn):
+        self.conn = conn
+        self._last_rowcount = 0
+    def execute(self, sql, params=()):
+        original = sql
+        sql = _translate_to_pg(sql)
+        # Handle SELECT changes() — return last rowcount
+        if sql.strip().upper() == "SELECT CHANGES()":
+            val = self._last_rowcount
+            class _Fake:
+                def fetchone(self): return (val,)
+                def fetchall(self): return [(val,)]
+            return _Fake()
+        is_or_ignore = "INSERT OR IGNORE INTO" in original
+        if is_or_ignore and "ON CONFLICT" not in sql.upper():
+            up = sql.upper()
+            if " RETURNING " in up:
+                idx = up.rindex(" RETURNING ")
+                sql = sql[:idx] + " ON CONFLICT DO NOTHING " + sql[idx:]
+            else:
+                sql = sql.rstrip("; ") + " ON CONFLICT DO NOTHING"
+        up = sql.upper().strip()
+        needs_returning = (up.startswith("INSERT INTO") and "RETURNING" not in up)
+        if needs_returning:
+            sql = sql.rstrip("; ") + " RETURNING id"
+        try:
+            cur = self.conn.cursor()
+            cur.execute(sql, params if params else None)
+        except Exception as e:
+            try: self.conn.rollback()
+            except Exception: pass
+            raise
+        lastrowid = None
+        if needs_returning:
+            try:
+                row = cur.fetchone()
+                if row: lastrowid = row[0]
+            except Exception: pass
+        try: self._last_rowcount = cur.rowcount
+        except Exception: pass
+        return _PGCursor(cur, lastrowid=lastrowid)
+    def executemany(self, sql, paramslist):
+        sql = _translate_to_pg(sql)
+        cur = self.conn.cursor()
+        cur.executemany(sql, paramslist)
+        try: self._last_rowcount = cur.rowcount
+        except Exception: pass
+        return _PGCursor(cur)
+    def commit(self):
+        try: self.conn.commit()
+        except Exception: pass
+    def close(self):
+        try: self.conn.close()
+        except Exception: pass
+
+
+def _get_pg_conn():
+    return _PGConn(psycopg2.connect(DATABASE_URL, sslmode="require"))
+
+
+def _init_pg_schema(conn):
+    """Postgres-compatible schema. Idempotent."""
+    stmts = [
+        """CREATE TABLE IF NOT EXISTS leads (
+            id SERIAL PRIMARY KEY,
+            name TEXT, email TEXT, phone TEXT, intl_phone TEXT, website TEXT,
+            address TEXT, city TEXT, country TEXT, category TEXT,
+            rating REAL DEFAULT 0, reviews INTEGER DEFAULT 0,
+            place_id TEXT UNIQUE, maps_url TEXT,
+            in_sequence INTEGER DEFAULT 0, sequence_step INTEGER DEFAULT 0,
+            next_send_at TEXT, replied INTEGER DEFAULT 0, unsubscribed INTEGER DEFAULT 0,
+            source TEXT DEFAULT 'manual', status TEXT DEFAULT 'new', campaign_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS email_log (
+            id SERIAL PRIMARY KEY, lead_id INTEGER, step INTEGER,
+            to_email TEXT, subject TEXT, status TEXT, error_msg TEXT,
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS sequences (
+            id SERIAL PRIMARY KEY, name TEXT NOT NULL, status TEXT DEFAULT 'active',
+            total_leads INTEGER DEFAULT 0, total_sent INTEGER DEFAULT 0,
+            total_failed INTEGER DEFAULT 0, total_replied INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS campaigns (
+            id SERIAL PRIMARY KEY, name TEXT NOT NULL, summary TEXT,
+            status TEXT DEFAULT 'draft', lead_ids_json TEXT NOT NULL,
+            recipient_count INTEGER DEFAULT 0, schedule_starts TEXT,
+            risk_score INTEGER DEFAULT 0, risk_notes TEXT,
+            est_open_rate REAL DEFAULT 0, est_reply_rate REAL DEFAULT 0,
+            deliverability TEXT, spf_status TEXT, dkim_status TEXT, dmarc_status TEXT,
+            approved_at TEXT, approved_by TEXT, rejected_reason TEXT,
+            actually_started INTEGER DEFAULT 0, actually_sent INTEGER DEFAULT 0,
+            actually_failed INTEGER DEFAULT 0, actually_replied INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS tracking_events (
+            id SERIAL PRIMARY KEY, log_id INTEGER, lead_id INTEGER,
+            event_type TEXT NOT NULL, url TEXT, ip TEXT, user_agent TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS contact_groups (
+            id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT,
+            color TEXT DEFAULT '#3b82f6', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS lead_group_assignments (
+            id SERIAL PRIMARY KEY, lead_id INTEGER NOT NULL, group_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(lead_id, group_id)
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_leads_sequence ON leads(in_sequence, next_send_at)",
+        "CREATE INDEX IF NOT EXISTS idx_log_sent_at ON email_log(sent_at)",
+        "CREATE INDEX IF NOT EXISTS idx_track_log ON tracking_events(log_id)",
+        "CREATE INDEX IF NOT EXISTS idx_track_event ON tracking_events(event_type)",
+        "CREATE INDEX IF NOT EXISTS idx_lga_lead ON lead_group_assignments(lead_id)",
+        "CREATE INDEX IF NOT EXISTS idx_lga_group ON lead_group_assignments(group_id)",
+    ]
+    for s in stmts:
+        try:
+            conn.execute(s)
+            conn.commit()
+        except Exception as e:
+            print("[init_pg]", str(e)[:200])
+            try: conn.conn.rollback()
+            except Exception: pass
+
+
+
 def get_db():
     if USE_POSTGRES:
         return _get_pg_conn()
