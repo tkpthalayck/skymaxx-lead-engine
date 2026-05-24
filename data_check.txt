@@ -1,0 +1,22 @@
+=== DATA STATE INVESTIGATION ===
+
+/api/stats: HTTP 200
+  Total leads:     0
+  Total sent:      0
+  Total replied:   None
+  Failed:          0
+  In sequence:     0
+  Pending sends:   None
+
+/api/log: HTTP 200
+  Total sent emails in DB: 0
+
+/api/leads: HTTP 200
+  Total leads in DB: 0
+
+/api/campaigns: HTTP 200
+  Total campaigns: 0
+
+=== Configuration ===
+  Domain: ?
+  From email: noreply@skymaxx.company
