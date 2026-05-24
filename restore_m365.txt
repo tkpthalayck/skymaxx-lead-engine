@@ -1,0 +1,4 @@
+  File "/home/runner/work/skymaxx-lead-engine/skymaxx-lead-engine/restore_m365.py", line 64
+    print(f"  - id={l.get(\"id\")} {l.get(\"name\",\"\")[:30]} | {l.get(\"email\",\"\")[:40]} | source={l.get(\"source\",\"?\")}")
+                           ^
+SyntaxError: unexpected character after line continuation character
