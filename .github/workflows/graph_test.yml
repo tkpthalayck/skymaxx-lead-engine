@@ -1,0 +1,26 @@
+name: Graph API Test
+on:
+  push:
+    paths: ['graph_test.py']
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Graph test
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          MAILBOX_EMAIL: ${{ secrets.MAILBOX_EMAIL }}
+        run: python3 graph_test.py
+      - name: Commit results
+        if: always()
+        run: |
+          git config user.email "bot@skymaxx.company"
+          git config user.name "Bot"
+          git add -f graph_test.txt || true
+          git diff --staged --quiet && echo "nothing" || git commit -m "graph test [skip ci]"
+          git push || true
