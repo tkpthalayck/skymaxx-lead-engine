@@ -1,0 +1,19 @@
+name: Verify Sender
+on:
+  push:
+    paths: ['verify_sender.py']
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 verify_sender.py
+      - if: always()
+        run: |
+          git config user.email "bot@skymaxx.company"
+          git config user.name "Bot"
+          git add -f sender_verify.txt || true
+          git diff --staged --quiet || git commit -m "sender verify [skip ci]"
+          git push || true
