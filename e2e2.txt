@@ -1,0 +1,22 @@
+=== HARDENED EMAIL SCRAPING E2E TEST ===
+
+Search: HTTP 200 in 10.4s, found 20
+To enrich: 20
+
+Batch 1 (4 leads):
+  FAIL 0.1s | {'error': 'HTTP Error 500: Internal Server Error'}
+Batch 2 (4 leads):
+  FAIL 0.1s | {'error': 'HTTP Error 500: Internal Server Error'}
+Batch 3 (4 leads):
+  FAIL 0.1s | {'error': 'HTTP Error 500: Internal Server Error'}
+Batch 4 (4 leads):
+  FAIL 0.1s | {'error': 'HTTP Error 500: Internal Server Error'}
+Batch 5 (4 leads):
+  FAIL 0.1s | {'error': 'HTTP Error 500: Internal Server Error'}
+
+=== FINAL ===
+Verified (scraped real emails): 0
+Generated (info@ fallback):     0
+Failed batches:                 5
+
+Sample real emails found:
