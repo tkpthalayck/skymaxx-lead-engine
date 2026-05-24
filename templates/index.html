@@ -416,6 +416,7 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
           <button class="btn btn-outline btn-sm" onclick="qsSelectAll(true)"><i class="fas fa-check-double"></i> All</button>
           <button class="btn btn-outline btn-sm" onclick="qsSelectAll(false)"><i class="fas fa-times"></i> Clear</button>
           <button class="btn btn-outline btn-sm" onclick="qsSelectWithEmail()"><i class="fas fa-envelope"></i> With Email</button>
+          <button class="btn btn-outline btn-sm" onclick="qsSelectVerified()" title="Select only leads with real scraped emails"><i class="fas fa-check-double" style="color:#34d399"></i> Verified Only</button>
           <button class="btn btn-purple btn-sm" onclick="qsAddToGroup()"><i class="fas fa-folder-plus"></i> Add to Group</button>
           <button class="btn btn-success btn-sm" onclick="qsSaveOnly()"><i class="fas fa-save"></i> Save Only</button>
           <button class="btn btn-primary btn-sm" onclick="qsCreateCampaign()"><i class="fas fa-rocket"></i> Add to New Campaign</button>
@@ -1175,7 +1176,7 @@ function renderQSResults() {
       '<div class="sr-info">' +
         '<div class="name">' + escapeHtml(r.name) + '</div>' +
         '<div class="meta">' +
-          (r.email ? '<span><i class="fas fa-envelope"></i>' + r.email + '</span>' : '<span style="color:var(--red)"><i class="fas fa-envelope-open"></i>no email</span>') +
+          (r.email ? '<span><i class="fas fa-envelope"></i><span style="color:' + (r.email_source==='scraped'?'#34d399':'#fbbf24') + '">' + r.email + '</span>' + (r.email_source==='scraped'?' <span title="Real email found on website" style="color:#34d399;font-size:9px">✓ verified</span>':' <span title="Generated guess (info@domain)" style="color:#fbbf24;font-size:9px">⚠ guess</span>') + '</span>' : '<span style="color:var(--red)"><i class="fas fa-envelope-open"></i>no email</span>') +
           (r.phone ? '<span><i class="fas fa-phone"></i>' + r.phone + '</span>' : '') +
           (r.website ? '<span><i class="fas fa-globe"></i><a href="' + r.website + '" target="_blank" style="color:var(--accent2);text-decoration:none">' + webShort + '</a></span>' : '') +
           (r.rating ? '<span><i class="fas fa-star" style="color:#f59e0b"></i>' + r.rating + ' (' + r.reviews + ')</span>' : '') +
@@ -1213,6 +1214,15 @@ function qsSelectWithEmail() {
   qsSelected.clear();
   if (qsResults) qsResults.filter(r => r.has_email && !r.already_saved).forEach(r => qsSelected.add(r.place_id));
   renderQSResults();
+}
+
+function qsSelectVerified() {
+  qsSelected.clear();
+  if (qsResults) qsResults.filter(r => r.email_source === 'scraped' && !r.already_saved).forEach(r => qsSelected.add(r.place_id));
+  renderQSResults();
+  if (qsSelected.size === 0) {
+    alert('No verified emails found in current results.\n\nVerified = real email scraped from the business website.\nGuess = generic info@domain.com (often not a real inbox).\n\nTry searching in a different city or category for businesses with better-maintained websites.');
+  }
 }
 
 async function qsAddToGroup() {
@@ -1394,7 +1404,7 @@ async function quickSearchV2() {
 
   const btn = document.getElementById('qs-btn');
   btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>';
-  document.getElementById('qs-status').innerHTML = '<div class="alert alert-info"><div class="spinner"></div><div>Searching Google Maps...</div></div>';
+  document.getElementById('qs-status').innerHTML = '<div class="alert alert-info"><div class="spinner"></div><div><strong>Searching Google Maps + scraping real emails from business websites...</strong> This takes 15-30 seconds per search.</div></div>';
 
   try {
     const r = await fetch('/api/search/v2/preview', {
