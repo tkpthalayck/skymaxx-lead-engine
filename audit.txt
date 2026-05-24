@@ -1,0 +1,34 @@
+=== FULL PLATFORM AUDIT ===
+
+[PASS] GET  /                                      | HTTP 200 | <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width
+[PASS] GET  /api/config                            | HTTP 200 | {"bcc_support":true,"daily_limit":300,"from_email":"noreply@skymaxx.company","from_name":"SKYMAXX Su
+[PASS] GET  /api/stats                             | HTTP 200 | {"bcc_support":true,"daily_limit":300,"in_sequence":0,"replied":0,"today_sent":0,"total_failed":0,"t
+[PASS] GET  /api/cities                            | HTTP 200 | ["Dubai, UAE","Abu Dhabi, UAE","Sharjah, UAE","Ajman, UAE","Riyadh, Saudi Arabia","Jeddah, Saudi Ara
+[PASS] GET  /api/prospecting/templates             | HTTP 200 | [{"id":"it_services","keyword":"IT services company","label":"IT Services & MSPs"},{"id":"consulting
+[PASS] GET  /api/sequence/templates                | HTTP 200 | [{"body":"<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f3f4f6;font-family:-appl
+[PASS] GET  /api/leads                             | HTTP 200 | {"leads":[],"page":1,"total":0}
+
+[PASS] GET  /api/log                               | HTTP 200 | {"log":[]}
+
+[PASS] GET  /api/sequence/queue                    | HTTP 200 | {"upcoming":[]}
+
+[PASS] GET  /api/campaigns                         | HTTP 200 | {"campaigns":[]}
+
+[PASS] GET  /api/groups                            | HTTP 200 | {"groups":[]}
+
+[FAIL] GET  /api/domain/health                     | HTTP 0 | HTTP Error 502: Bad Gateway
+[PASS] GET  /api/ai/status                         | HTTP 200 | {"available_actions":["rewrite","improve_conversion","personalize","make_professional","make_friendl
+[PASS] GET  /api/analytics/summary                 | HTTP 200 | {"click_rate":0,"clicks_unique":0,"delivered":0,"failed":0,"open_rate":0,"opens_unique":0,"replies":
+[PASS] GET  /api/analytics/by_step                 | HTTP 200 | {"by_step":[{"click_rate":0,"clicks":0,"name":"Initial Outreach","open_rate":0,"opens":0,"sent":0,"s
+[PASS] GET  /api/replies/status                    | HTTP 200 | {"configured":true,"mailbox":"support@skymaxx.company","poll_minutes":5}
+
+[PASS] POST /api/groups                            | HTTP 200 | {"id":1,"name":"_test_audit_group"}
+
+[PASS] GET  /api/groups                            | HTTP 200 | {"groups":[{"color":"#3b82f6","created_at":"2026-05-24 13:13:25","description":"audit","id":1,"lead_
+[FAIL] POST /api/search/preview                    | HTTP 0 | HTTP Error 502: Bad Gateway
+
+=== Summary: 17 passed, 2 failed ===
