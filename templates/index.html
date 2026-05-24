@@ -353,44 +353,69 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
     <!-- ────────────────── FIND LEADS ────────────────── -->
     <div class="tab-panel" id="tab-search">
       <div class="alert alert-info">
-        <i class="fas fa-info-circle"></i>
+        <i class="fas fa-globe"></i>
         <div>
-          <strong>Single-Page Lead Discovery</strong> — Search Google Maps, review results inline, select leads, then add them to a campaign or contact group with one click. Nothing is saved until you decide.
+          <strong>B2B Prospect Discovery</strong> — Use hierarchical filters (Country → State → Category → Job Title) to find businesses. Google Maps finds companies; job titles filter is used as search context.
         </div>
       </div>
 
+      <!-- ─── QUICK SEARCH (single combo) ─── -->
       <div class="card">
-        <div class="card-title"><i class="fas fa-search"></i> Quick Search</div>
+        <div class="card-title"><i class="fas fa-bullseye"></i> Quick Search <span class="right">Single combination, fast results with full contact details</span></div>
+
         <div class="form-row">
           <div class="form-group">
-            <label>Business Type or Keyword</label>
-            <input id="qs-keyword" placeholder="e.g. IT services, dental clinic, real estate agency" oninput="qsKeywordChange()"/>
+            <label><i class="fas fa-globe-asia"></i> Country</label>
+            <select id="qs-country" onchange="qsCountryChanged()">
+              <option value="">— Select country —</option>
+            </select>
           </div>
-          <div class="form-group" style="max-width:260px">
-            <label>City</label>
-            <select id="qs-city"></select>
+          <div class="form-group">
+            <label><i class="fas fa-map-marked-alt"></i> State / Region</label>
+            <select id="qs-state">
+              <option value="">— Any state —</option>
+            </select>
           </div>
-          <div class="form-group" style="max-width:130px;justify-content:flex-end">
-            <button class="btn btn-primary" id="qs-btn" onclick="quickSearch()"><i class="fas fa-search"></i> Search</button>
+          <div class="form-group">
+            <label><i class="fas fa-city"></i> City (Optional)</label>
+            <input id="qs-city-input" placeholder="e.g. Dubai Marina"/>
           </div>
         </div>
 
-        <!-- Preset keywords for one-click search -->
-        <div style="margin-top:8px">
-          <span style="font-size:11px;color:var(--muted);margin-right:8px">Quick presets:</span>
-          <div class="chip-grid" id="qs-presets" style="max-height:80px;display:inline-flex;background:transparent;border:none;padding:0;gap:6px"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label><i class="fas fa-briefcase"></i> Business Category</label>
+            <select id="qs-category">
+              <option value="">— Pick a category —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label><i class="fas fa-user-tie"></i> Job Title <span style="text-transform:none;font-weight:400;opacity:.6">(optional, keyword filter)</span></label>
+            <select id="qs-title">
+              <option value="">— Any title —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label><i class="fas fa-search"></i> Custom Keyword <span style="text-transform:none;font-weight:400;opacity:.6">(overrides category)</span></label>
+            <input id="qs-keyword" placeholder="e.g. dental clinic, fitness center"/>
+          </div>
+        </div>
+
+        <div class="flex gap-2 mt-2">
+          <button class="btn btn-primary" id="qs-btn" onclick="quickSearchV2()"><i class="fas fa-search"></i> Search</button>
+          <button class="btn btn-outline btn-sm" onclick="qsClearFilters()"><i class="fas fa-broom"></i> Clear</button>
         </div>
 
         <div id="qs-status" class="mt-2"></div>
       </div>
 
-      <!-- Inline Results -->
+      <!-- ─── INLINE RESULTS ─── -->
       <div id="qs-results-card" class="card" style="display:none">
         <div class="action-bar">
           <span class="count" id="qs-count">0 selected</span>
-          <button class="btn btn-outline btn-sm" onclick="qsSelectAll(true)"><i class="fas fa-check-double"></i> Select All</button>
+          <button class="btn btn-outline btn-sm" onclick="qsSelectAll(true)"><i class="fas fa-check-double"></i> All</button>
           <button class="btn btn-outline btn-sm" onclick="qsSelectAll(false)"><i class="fas fa-times"></i> Clear</button>
-          <button class="btn btn-outline btn-sm" onclick="qsSelectWithEmail()"><i class="fas fa-envelope"></i> Select w/ Email</button>
+          <button class="btn btn-outline btn-sm" onclick="qsSelectWithEmail()"><i class="fas fa-envelope"></i> With Email</button>
           <button class="btn btn-purple btn-sm" onclick="qsAddToGroup()"><i class="fas fa-folder-plus"></i> Add to Group</button>
           <button class="btn btn-success btn-sm" onclick="qsSaveOnly()"><i class="fas fa-save"></i> Save Only</button>
           <button class="btn btn-primary btn-sm" onclick="qsCreateCampaign()"><i class="fas fa-rocket"></i> Add to New Campaign</button>
@@ -398,35 +423,51 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
         <div id="qs-results"></div>
       </div>
 
-      <!-- Bulk Multi-City Search (existing) -->
+      <!-- ─── BULK MULTI-DIMENSIONAL SEARCH ─── -->
       <div class="card">
-        <div class="card-title"><i class="fas fa-layer-group"></i> Bulk Multi-City Search <span class="right">Run many searches at once</span></div>
+        <div class="card-title"><i class="fas fa-layer-group"></i> Bulk Multi-Dimensional Search <span class="right">Run many combinations at once</span></div>
+
         <details>
-          <summary style="cursor:pointer;color:var(--muted);font-size:13px">Click to expand bulk search (saves directly to database)</summary>
+          <summary style="cursor:pointer;color:var(--accent);font-size:13px;margin-bottom:14px">
+            <i class="fas fa-rocket"></i> Click to expand bulk search — search across multiple countries × states × categories × titles
+          </summary>
+
           <div style="margin-top:14px">
-            <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Pick categories:</div>
-            <div class="chip-grid" id="categories-grid" style="max-height:120px"></div>
-            <div style="font-size:12px;color:var(--muted);margin:14px 0 8px">Pick cities:</div>
-            <div class="chip-grid" id="cities-grid" style="max-height:120px"></div>
-            <div class="chip-row-actions">
-              <button class="btn btn-xs btn-outline" onclick="selectAllCities(true)"><i class="fas fa-check-double"></i> All UAE</button>
-              <button class="btn btn-xs btn-outline" onclick="selectAllCities('gcc')"><i class="fas fa-globe"></i> All GCC</button>
-              <button class="btn btn-xs btn-outline" onclick="selectAllCities(false)"><i class="fas fa-times"></i> Clear</button>
-            </div>
-            <div class="alert alert-warn mt-3" id="search-summary" style="display:none">
-              <i class="fas fa-info-circle"></i>
-              <div><span id="sum-cats">0</span> categories × <span id="sum-cities">0</span> cities = <strong><span id="sum-total">0</span> searches</strong></div>
-            </div>
-            <button class="btn btn-primary mt-2" id="search-btn" onclick="launchSearch()"><i class="fas fa-rocket"></i> Launch Bulk Search</button>
-            <div id="search-status" class="mt-2"></div>
-            <div id="search-results" class="mt-2"></div>
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:block"><i class="fas fa-globe-asia"></i> Countries (multi-select)</label>
+            <div class="chip-grid" id="bulk-countries" style="max-height:140px"></div>
           </div>
+
+          <div style="margin-top:14px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:block"><i class="fas fa-map-marked-alt"></i> States / Regions (auto-populated from selected countries)</label>
+            <div class="chip-grid" id="bulk-states" style="max-height:140px"></div>
+          </div>
+
+          <div style="margin-top:14px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:block"><i class="fas fa-briefcase"></i> Business Categories (multi-select)</label>
+            <div class="chip-grid" id="bulk-categories" style="max-height:140px"></div>
+          </div>
+
+          <div style="margin-top:14px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:block"><i class="fas fa-user-tie"></i> Job Titles (optional)</label>
+            <div class="chip-grid" id="bulk-titles" style="max-height:140px"></div>
+          </div>
+
+          <div class="alert alert-warn mt-3" id="bulk-summary" style="display:none">
+            <i class="fas fa-info-circle"></i>
+            <div><strong><span id="bs-combos">0</span> combinations</strong>
+              (<span id="bs-countries">0</span> countries × <span id="bs-states">0</span> states × <span id="bs-cats">0</span> categories × <span id="bs-titles">0</span> titles)
+              — capped at 12 to prevent timeouts</div>
+          </div>
+
+          <button class="btn btn-primary mt-2" id="bulk-btn" onclick="bulkSearchV2()"><i class="fas fa-rocket"></i> Launch Bulk Search</button>
+          <div id="bulk-status" class="mt-2"></div>
         </details>
       </div>
 
+      <!-- ─── CSV IMPORT ─── -->
       <div class="card">
         <div class="card-title"><i class="fas fa-file-import"></i> Import CSV</div>
-        <div class="alert alert-info"><i class="fas fa-info-circle"></i><div>CSV columns: <code>name, email, phone, website, city, country</code></div></div>
+        <div class="alert alert-info"><i class="fas fa-info-circle"></i><div>Columns: <code>name, email, phone, website, city, country</code></div></div>
         <div class="flex gap-2">
           <input type="file" id="csv-file" accept=".csv" style="flex:1"/>
           <button class="btn btn-primary" onclick="uploadCSV()"><i class="fas fa-upload"></i> Upload</button>
@@ -1099,6 +1140,258 @@ function escapeHtml(s) {
   if (!s) return '';
   return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
+
+
+// ─────────────────────────────────────────────
+// HIERARCHICAL SEARCH v2 (Country/State/Category/Title)
+// ─────────────────────────────────────────────
+let v2Countries = [];
+let v2Categories = [];
+let v2Titles = [];
+let bulkSelected = { countries: new Set(), states: new Set(), categories: new Set(), titles: new Set() };
+
+async function initV2Search() {
+  try {
+    v2Countries  = await fetch('/api/locations/countries').then(r=>r.json());
+    v2Categories = await fetch('/api/business_categories').then(r=>r.json());
+    v2Titles     = await fetch('/api/job_titles').then(r=>r.json());
+  } catch(e) { console.error('initV2:', e); return; }
+
+  // Populate Quick Search dropdowns
+  const csel = document.getElementById('qs-country');
+  if (csel && csel.options.length <= 1) {
+    let region = '';
+    v2Countries.forEach(c => {
+      if (c.region !== region) {
+        region = c.region;
+        const opt = document.createElement('optgroup');
+        opt.label = '— ' + region + ' —';
+        csel.appendChild(opt);
+      }
+      const opt = document.createElement('option');
+      opt.value = c.code; opt.textContent = c.name + ' (' + c.code + ')';
+      csel.appendChild(opt);
+    });
+  }
+  const cat = document.getElementById('qs-category');
+  if (cat && cat.options.length <= 1) {
+    v2Categories.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.keyword; o.textContent = c.label;
+      cat.appendChild(o);
+    });
+  }
+  const tt = document.getElementById('qs-title');
+  if (tt && tt.options.length <= 1) {
+    v2Titles.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t.keyword; o.textContent = t.label;
+      tt.appendChild(o);
+    });
+  }
+
+  // Populate Bulk multi-select chips
+  renderBulkChips('bulk-countries', v2Countries.map(c=>({id:c.code, label:c.name + ' (' + c.region + ')'})), 'countries');
+  renderBulkChips('bulk-categories', v2Categories.map(c=>({id:c.keyword, label:c.label})), 'categories');
+  renderBulkChips('bulk-titles', v2Titles.map(t=>({id:t.keyword, label:t.label})), 'titles');
+  renderBulkStates();
+}
+
+function renderBulkChips(containerId, items, kind) {
+  const c = document.getElementById(containerId);
+  if (!c) return;
+  c.innerHTML = items.map(i => {
+    const sel = bulkSelected[kind].has(i.id) ? 'selected' : '';
+    return `<span class="chip ${sel}" data-id="${escapeHtml(i.id)}" data-kind="${kind}" onclick="toggleBulkChip(this)">${escapeHtml(i.label)}</span>`;
+  }).join('');
+}
+
+function toggleBulkChip(el) {
+  const id = el.dataset.id;
+  const kind = el.dataset.kind;
+  if (bulkSelected[kind].has(id)) { bulkSelected[kind].delete(id); el.classList.remove('selected'); }
+  else { bulkSelected[kind].add(id); el.classList.add('selected'); }
+  if (kind === 'countries') renderBulkStates();
+  updateBulkSummary();
+}
+
+function renderBulkStates() {
+  const div = document.getElementById('bulk-states');
+  if (!div) return;
+  if (!bulkSelected.countries.size) {
+    div.innerHTML = '<span style="color:var(--muted);font-size:12px;padding:8px">Pick countries first to see their states/regions</span>';
+    return;
+  }
+  // Fetch states for each selected country
+  Promise.all(Array.from(bulkSelected.countries).map(code =>
+    fetch('/api/locations/states/' + code).then(r=>r.json()).then(s => s.map(name => ({code, name})))
+  )).then(arrs => {
+    const flat = arrs.flat();
+    const items = flat.map(s => ({id: s.name, label: s.name + ' (' + s.code + ')'}));
+    // Clean up bulk states for unselected countries
+    const validNames = new Set(flat.map(s => s.name));
+    Array.from(bulkSelected.states).forEach(n => { if (!validNames.has(n)) bulkSelected.states.delete(n); });
+    renderBulkChips('bulk-states', items, 'states');
+    updateBulkSummary();
+  });
+}
+
+function updateBulkSummary() {
+  const c = bulkSelected.countries.size;
+  const s = bulkSelected.states.size;
+  const cat = bulkSelected.categories.size;
+  const t = bulkSelected.titles.size || 1;
+  const combos = (Math.max(c, 1)) * Math.max(s || 1, 1) * cat * t;
+  // Realistic: at least 1 geo dim required
+  const geoCombos = (c || 0) + (s || 0);
+  const total = (cat || 0) * Math.max(c || 0, 0) * (s || 0 || 1);
+  document.getElementById('bs-countries').textContent = c;
+  document.getElementById('bs-states').textContent = s || '(none)';
+  document.getElementById('bs-cats').textContent = cat;
+  document.getElementById('bs-titles').textContent = t === 1 && !bulkSelected.titles.size ? '(any)' : t;
+  document.getElementById('bs-combos').textContent = combos;
+  document.getElementById('bulk-summary').style.display = (cat && (c || s)) ? 'flex' : 'none';
+}
+
+async function qsCountryChanged() {
+  const code = document.getElementById('qs-country').value;
+  const stateSel = document.getElementById('qs-state');
+  stateSel.innerHTML = '<option value="">— Any state —</option>';
+  if (!code) return;
+  const states = await fetch('/api/locations/states/' + code).then(r=>r.json());
+  states.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    stateSel.appendChild(o);
+  });
+}
+
+function qsClearFilters() {
+  ['qs-country','qs-state','qs-city-input','qs-category','qs-title','qs-keyword'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('qs-results-card').style.display = 'none';
+}
+
+async function quickSearchV2() {
+  const country = document.getElementById('qs-country').selectedOptions[0]?.textContent?.split(' (')[0] || '';
+  const state   = document.getElementById('qs-state').value;
+  const city    = document.getElementById('qs-city-input').value;
+  const category= document.getElementById('qs-category').value;
+  const title   = document.getElementById('qs-title').value;
+  const keyword = document.getElementById('qs-keyword').value;
+  if (!(country || state || city)) { alert('Pick at least a Country, State, or City'); return; }
+  if (!category && !keyword) { alert('Pick a Business Category or enter a Custom Keyword'); return; }
+
+  const btn = document.getElementById('qs-btn');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>';
+  document.getElementById('qs-status').innerHTML = '<div class="alert alert-info"><div class="spinner"></div><div>Searching Google Maps...</div></div>';
+
+  try {
+    const r = await fetch('/api/search/v2/preview', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({country, state, city, category, job_title:title, keyword})
+    }).then(r=>r.json());
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Search';
+    if (r.error) {
+      document.getElementById('qs-status').innerHTML = `<div class="alert alert-error">${escapeHtml(r.error)}</div>`;
+      return;
+    }
+    qsResults = r.results || [];
+    qsSelected.clear();
+    let statusHtml = `<div class="alert alert-success"><i class="fas fa-check"></i><div><strong>${r.found} businesses found</strong> for: <code>${escapeHtml(r.query)}</code></div></div>`;
+    if (r.note) statusHtml += `<div class="alert alert-warn"><i class="fas fa-info-circle"></i><div>${escapeHtml(r.note)}</div></div>`;
+    document.getElementById('qs-status').innerHTML = statusHtml;
+    renderQSResults();
+    document.getElementById('qs-results-card').style.display = 'block';
+  } catch(e) {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Search';
+    document.getElementById('qs-status').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+async function bulkSearchV2() {
+  const countries  = Array.from(bulkSelected.countries).map(code => v2Countries.find(c=>c.code===code)?.name).filter(Boolean);
+  const states     = Array.from(bulkSelected.states);
+  const categories = Array.from(bulkSelected.categories);
+  const titles     = Array.from(bulkSelected.titles);
+  if (!categories.length) { alert('Pick at least 1 Business Category'); return; }
+  if (!countries.length && !states.length) { alert('Pick at least 1 Country or State'); return; }
+
+  const btn = document.getElementById('bulk-btn');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>';
+  document.getElementById('bulk-status').innerHTML = '<div class="alert alert-info"><div class="spinner"></div><div>Running bulk multi-dimensional search... this may take 1-3 minutes</div></div>';
+
+  try {
+    const r = await fetch('/api/search/v2/bulk_preview', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({countries, states, categories, job_titles:titles})
+    }).then(r=>r.json());
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-rocket"></i> Launch Bulk Search';
+    if (r.error) {
+      document.getElementById('bulk-status').innerHTML = `<div class="alert alert-error">${escapeHtml(r.error)}</div>`;
+      return;
+    }
+    qsResults = r.results || [];
+    qsSelected.clear();
+    let summary = `<div class="alert alert-success"><i class="fas fa-check"></i><div><strong>${r.found} unique businesses</strong> across ${r.combinations_run} combinations${r.capped?' (capped at 12)':''}</div></div>`;
+    if (r.note) summary += `<div class="alert alert-info"><i class="fas fa-info-circle"></i><div>${escapeHtml(r.note)}</div></div>`;
+    // Show combo breakdown
+    const breakdown = (r.summary || []).map(s =>
+      `<div style="padding:5px 10px;background:${s.error?'rgba(239,68,68,.08)':'rgba(16,185,129,.08)'};border-radius:5px;font-size:11px">
+        ${escapeHtml(s.category)} ${s.job_title?'+ '+escapeHtml(s.job_title):''} → ${escapeHtml(s.state || s.country)}: <strong>${s.found}</strong> ${s.error?`<span style="color:var(--red)">(${escapeHtml(s.error)})</span>`:''}
+      </div>`).join('');
+    summary += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">' + breakdown + '</div>';
+    document.getElementById('bulk-status').innerHTML = summary;
+    renderQSResults();
+    document.getElementById('qs-results-card').style.display = 'block';
+    document.getElementById('qs-results-card').scrollIntoView({behavior:'smooth'});
+  } catch(e) {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-rocket"></i> Launch Bulk Search';
+    document.getElementById('bulk-status').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// Override save endpoint to use v2 (fetches full details for bulk-preview results)
+async function qsSaveOnly() {
+  if (!qsSelected.size) { alert('Select at least one lead'); return; }
+  const selected = qsResults.filter(r => qsSelected.has(r.place_id));
+  const btn = event && event.target;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>'; }
+  const r = await fetch('/api/search/v2/save_selected', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({leads: selected})
+  }).then(r=>r.json());
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Only'; }
+  if (r.error) { alert(r.error); return; }
+  alert('Saved ' + r.saved + ' leads. View them in "All Leads" tab.');
+  qsSelected.clear(); loadStats();
+  selected.forEach(s => { const f = qsResults.find(x => x.place_id === s.place_id); if (f) f.already_saved = true; });
+  renderQSResults();
+}
+
+async function qsCreateCampaign() {
+  if (!qsSelected.size) { alert('Select at least one lead'); return; }
+  const selected = qsResults.filter(r => qsSelected.has(r.place_id));
+  const r = await fetch('/api/search/v2/save_selected', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({leads: selected})
+  }).then(r=>r.json());
+  if (r.error) { alert(r.error); return; }
+  const name = prompt('Campaign name:', 'Outreach ' + new Date().toLocaleDateString());
+  if (name === null) return;
+  const r2 = await fetch('/api/campaigns/draft', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, lead_ids: r.lead_ids})
+  }).then(r=>r.json());
+  if (r2.error) { alert(r2.error); return; }
+  currentCampaignId = r2.campaign_id;
+  showApprovalModal(r2);
+  qsSelected.clear();
+}
+
+setTimeout(initV2Search, 1800);
 
 init();
 </script>
