@@ -23,6 +23,8 @@ FROM_EMAIL          = os.getenv("FROM_EMAIL", "noreply@skymaxx.company")
 FROM_NAME           = os.getenv("FROM_NAME", "SKYMAXX Support Team")
 REPLY_TO            = os.getenv("REPLY_TO", "support@skymaxx.company")
 BCC_SUPPORT         = os.getenv("BCC_SUPPORT", "true").lower() == "true"  # BCC support@ on all sends
+APP_URL             = os.getenv("APP_URL", "https://skymaxx-lead-engine.onrender.com").rstrip("/")
+TRACKING_ENABLED    = os.getenv("TRACKING_ENABLED", "true").lower() == "true"
 DAILY_SEND_LIMIT    = int(os.getenv("DAILY_SEND_LIMIT", "300"))
 DB_PATH             = os.getenv("DB_PATH", "skymaxx.db")
 
@@ -173,9 +175,50 @@ def init_db():
             count INTEGER DEFAULT 0
         );
 
+        CREATE TABLE IF NOT EXISTS tracking_events (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            log_id       INTEGER,
+            lead_id      INTEGER,
+            event_type   TEXT NOT NULL,
+            url          TEXT,
+            ip           TEXT,
+            user_agent   TEXT,
+            created_at   TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS contact_groups (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL UNIQUE,
+            description TEXT,
+            color       TEXT DEFAULT '#3b82f6',
+            created_at  TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS lead_group_assignments (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            lead_id    INTEGER NOT NULL,
+            group_id   INTEGER NOT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(lead_id, group_id)
+        );
+
         CREATE INDEX IF NOT EXISTS idx_leads_sequence ON leads(in_sequence, next_send_at);
         CREATE INDEX IF NOT EXISTS idx_log_sent_at ON email_log(sent_at);
+        CREATE INDEX IF NOT EXISTS idx_track_log ON tracking_events(log_id);
+        CREATE INDEX IF NOT EXISTS idx_track_event ON tracking_events(event_type);
+        CREATE INDEX IF NOT EXISTS idx_lga_lead ON lead_group_assignments(lead_id);
+        CREATE INDEX IF NOT EXISTS idx_lga_group ON lead_group_assignments(group_id);
     """)
+
+    # Migration: add source column if missing
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(leads)").fetchall()]
+    if 'source' not in cols:
+        try: conn.execute("ALTER TABLE leads ADD COLUMN source TEXT DEFAULT 'manual'")
+        except Exception: pass
+    if 'campaign_id' not in cols:
+        try: conn.execute("ALTER TABLE leads ADD COLUMN campaign_id INTEGER")
+        except Exception: pass
+
     conn.commit()
     conn.close()
 
@@ -212,9 +255,32 @@ def personalize(text, lead):
                 .replace("{{city}}", lead.get("city", "your area"))
                 .replace("{{website}}", lead.get("website", "")))
 
-def send_via_zepto(to_email, to_name, subject, html_body):
+def inject_tracking(html_body, log_id):
+    """Add tracking pixel + rewrite links for open/click tracking."""
+    if not TRACKING_ENABLED or not log_id:
+        return html_body
+    import re as _re, urllib.parse as _up
+    def _rewrite(m):
+        url = m.group(1)
+        if (APP_URL in url or url.startswith("mailto:") or url.startswith("#")
+            or "unsubscribe" in url.lower()):
+            return m.group(0)
+        encoded = _up.quote(url, safe="")
+        return 'href="' + APP_URL + '/track/click/' + str(log_id) + '?url=' + encoded + '"'
+    html_body = _re.sub(r'href="(https?://[^"]+)"', _rewrite, html_body)
+    pixel = '<img src="' + APP_URL + '/track/open/' + str(log_id) + '.png" width="1" height="1" style="display:none;border:0" alt=""/>'
+    if "</body>" in html_body:
+        html_body = html_body.replace("</body>", pixel + "</body>", 1)
+    else:
+        html_body = html_body + pixel
+    return html_body
+
+
+def send_via_zepto(to_email, to_name, subject, html_body, log_id=None):
     if not ZEPTO_TOKEN:
         return False, "ZEPTO_TOKEN not configured"
+    if log_id and TRACKING_ENABLED:
+        html_body = inject_tracking(html_body, log_id)
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
@@ -274,12 +340,22 @@ def process_pending_sends():
         subject = personalize(tpl["subject"], lead)
         body    = personalize(tpl["body"],    lead)
 
-        ok, err = send_via_zepto(lead["email"], lead["name"], subject, body)
+        # Insert log first to get log_id for tracking
         conn = get_db()
-        conn.execute("""INSERT INTO email_log (lead_id, step, to_email, subject, status, error_msg)
-                        VALUES (?, ?, ?, ?, ?, ?)""",
-                     [lead["id"], next_step, lead["email"], subject,
-                      "success" if ok else "failed", err or ""])
+        cur = conn.execute("""INSERT INTO email_log (lead_id, step, to_email, subject, status, error_msg)
+                        VALUES (?, ?, ?, ?, 'sending', '')""",
+                     [lead["id"], next_step, lead["email"], subject])
+        log_id = cur.lastrowid
+        conn.commit(); conn.close()
+
+        ok, err = send_via_zepto(lead["email"], lead["name"], subject, body, log_id=log_id)
+        conn = get_db()
+        conn.execute("UPDATE email_log SET status=?, error_msg=? WHERE id=?",
+                     ["success" if ok else "failed", err or "", log_id])
+        # Auto-update lead status
+        if ok:
+            conn.execute("UPDATE leads SET status='contacted' WHERE id=? AND status NOT IN ('replied','qualified','interested')",
+                         [lead["id"]])
         if ok:
             increment_send_count()
             if next_step >= 5:
@@ -413,6 +489,18 @@ def leads():
     conn = get_db()
     total = conn.execute(q.replace("SELECT *", "SELECT COUNT(*)"), params).fetchone()[0]
     items = rows_to_list(conn.execute(q + f" ORDER BY created_at DESC LIMIT {per_pg} OFFSET {offset}", params).fetchall())
+    # Attach group memberships
+    if items:
+        ids = [l["id"] for l in items]
+        placeholders = ",".join("?" * len(ids))
+        memberships = conn.execute(f"""SELECT lga.lead_id, g.id, g.name, g.color
+            FROM lead_group_assignments lga JOIN contact_groups g ON g.id = lga.group_id
+            WHERE lga.lead_id IN ({placeholders})""", ids).fetchall()
+        group_map = {}
+        for m in memberships:
+            group_map.setdefault(m["lead_id"], []).append({"id": m["id"], "name": m["name"], "color": m["color"]})
+        for l in items:
+            l["groups"] = group_map.get(l["id"], [])
     conn.close()
     return jsonify({"leads": items, "total": total, "page": page})
 
@@ -649,8 +737,8 @@ def import_csv():
     imported = 0
     for row in reader:
         try:
-            conn.execute("""INSERT OR IGNORE INTO leads (name,email,phone,website,city,country)
-                VALUES (?,?,?,?,?,?)""",
+            conn.execute("""INSERT OR IGNORE INTO leads (name,email,phone,website,city,country,source,status)
+                VALUES (?,?,?,?,?,?,'uploaded','new')""",
                 [row.get("name","").strip(), row.get("email","").strip(),
                  row.get("phone","").strip(), row.get("website","").strip(),
                  row.get("city","").strip(), row.get("country","").strip()])
@@ -1221,6 +1309,346 @@ def ai_status():
         "provider":   AI_PROVIDER or None,
         "available_actions": list(AI_ACTION_PROMPTS.keys()),
     })
+
+
+
+# ─────────────────────────────────────────────
+# CONTACT GROUPS
+# ─────────────────────────────────────────────
+@app.route("/api/groups", methods=["GET"])
+def list_groups():
+    conn = get_db()
+    rows = rows_to_list(conn.execute("""
+        SELECT g.*, COUNT(lga.lead_id) AS lead_count
+        FROM contact_groups g
+        LEFT JOIN lead_group_assignments lga ON g.id = lga.group_id
+        GROUP BY g.id ORDER BY g.name""").fetchall())
+    conn.close()
+    return jsonify({"groups": rows})
+
+
+@app.route("/api/groups", methods=["POST"])
+def create_group():
+    data = request.json or {}
+    name = (data.get("name") or "").strip()
+    if not name: return jsonify({"error": "name required"}), 400
+    conn = get_db()
+    try:
+        cur = conn.execute("INSERT INTO contact_groups (name, description, color) VALUES (?,?,?)",
+                           [name, data.get("description",""), data.get("color","#3b82f6")])
+        conn.commit()
+        gid = cur.lastrowid
+    except Exception as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 400
+    conn.close()
+    return jsonify({"id": gid, "name": name})
+
+
+@app.route("/api/groups/<int:gid>", methods=["DELETE"])
+def delete_group(gid):
+    conn = get_db()
+    conn.execute("DELETE FROM lead_group_assignments WHERE group_id=?", [gid])
+    conn.execute("DELETE FROM contact_groups WHERE id=?", [gid])
+    conn.commit(); conn.close()
+    return jsonify({"deleted": True})
+
+
+@app.route("/api/groups/<int:gid>/leads", methods=["GET"])
+def group_leads(gid):
+    conn = get_db()
+    rows = rows_to_list(conn.execute("""
+        SELECT l.* FROM leads l
+        JOIN lead_group_assignments lga ON l.id = lga.lead_id
+        WHERE lga.group_id=? ORDER BY l.name""", [gid]).fetchall())
+    conn.close()
+    return jsonify({"leads": rows})
+
+
+@app.route("/api/groups/<int:gid>/add", methods=["POST"])
+def add_leads_to_group(gid):
+    data = request.json or {}
+    lead_ids = data.get("lead_ids", [])
+    if not lead_ids: return jsonify({"error": "no lead_ids"}), 400
+    conn = get_db()
+    added = 0
+    for lid in lead_ids:
+        try:
+            conn.execute("INSERT OR IGNORE INTO lead_group_assignments (lead_id, group_id) VALUES (?,?)", [lid, gid])
+            if conn.execute("SELECT changes()").fetchone()[0]: added += 1
+        except Exception: pass
+    conn.commit(); conn.close()
+    return jsonify({"added": added})
+
+
+@app.route("/api/groups/<int:gid>/remove", methods=["POST"])
+def remove_leads_from_group(gid):
+    data = request.json or {}
+    lead_ids = data.get("lead_ids", [])
+    if not lead_ids: return jsonify({"error": "no lead_ids"}), 400
+    placeholders = ",".join("?" * len(lead_ids))
+    conn = get_db()
+    conn.execute(f"DELETE FROM lead_group_assignments WHERE group_id=? AND lead_id IN ({placeholders})",
+                 [gid] + lead_ids)
+    removed = conn.execute("SELECT changes()").fetchone()[0]
+    conn.commit(); conn.close()
+    return jsonify({"removed": removed})
+
+
+# ─────────────────────────────────────────────
+# CAMPAIGN PAUSE / RESUME / STOP
+# ─────────────────────────────────────────────
+@app.route("/api/campaigns/<int:cid>/pause", methods=["POST"])
+def pause_campaign(cid):
+    """Pause: keep leads in sequence record but stop sending."""
+    conn = get_db()
+    camp = conn.execute("SELECT lead_ids_json FROM campaigns WHERE id=?", [cid]).fetchone()
+    if not camp:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    lead_ids = json.loads(camp["lead_ids_json"])
+    placeholders = ",".join("?" * len(lead_ids)) if lead_ids else "NULL"
+    if lead_ids:
+        conn.execute(f"UPDATE leads SET in_sequence=0 WHERE id IN ({placeholders})", lead_ids)
+    conn.execute("UPDATE campaigns SET status='paused' WHERE id=?", [cid])
+    conn.commit(); conn.close()
+    return jsonify({"paused": True})
+
+
+@app.route("/api/campaigns/<int:cid>/resume", methods=["POST"])
+def resume_campaign(cid):
+    """Resume: re-enable in_sequence for leads not yet completed."""
+    conn = get_db()
+    camp = conn.execute("SELECT lead_ids_json FROM campaigns WHERE id=?", [cid]).fetchone()
+    if not camp:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    lead_ids = json.loads(camp["lead_ids_json"])
+    placeholders = ",".join("?" * len(lead_ids)) if lead_ids else "NULL"
+    if lead_ids:
+        conn.execute(f"""UPDATE leads SET in_sequence=1, next_send_at=?
+            WHERE id IN ({placeholders}) AND sequence_step<5 AND replied=0 AND unsubscribed=0""",
+            [datetime.utcnow().isoformat()] + lead_ids)
+    conn.execute("UPDATE campaigns SET status='approved' WHERE id=?", [cid])
+    conn.commit(); conn.close()
+    return jsonify({"resumed": True})
+
+
+@app.route("/api/campaigns/<int:cid>/stop", methods=["POST"])
+def stop_campaign(cid):
+    """Stop permanently: remove leads from sequence, mark campaign completed."""
+    conn = get_db()
+    camp = conn.execute("SELECT lead_ids_json FROM campaigns WHERE id=?", [cid]).fetchone()
+    if not camp:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    lead_ids = json.loads(camp["lead_ids_json"])
+    placeholders = ",".join("?" * len(lead_ids)) if lead_ids else "NULL"
+    if lead_ids:
+        conn.execute(f"UPDATE leads SET in_sequence=0 WHERE id IN ({placeholders})", lead_ids)
+    conn.execute("UPDATE campaigns SET status='stopped' WHERE id=?", [cid])
+    conn.commit(); conn.close()
+    return jsonify({"stopped": True})
+
+
+# ─────────────────────────────────────────────
+# SEARCH PREVIEW (no auto-save) + quick campaign
+# ─────────────────────────────────────────────
+@app.route("/api/search/preview", methods=["POST"])
+def search_preview():
+    """Search Google Maps but DON'T save - return results so user can select before saving."""
+    data = request.json or {}
+    keyword = data.get("keyword", "")
+    city = data.get("city", "Dubai, UAE")
+    if not GOOGLE_MAPS_API_KEY:
+        return jsonify({"error": "Google Maps not configured"}), 400
+    if not keyword:
+        return jsonify({"error": "keyword required"}), 400
+
+    try:
+        resp = requests.get(PLACES_TEXT_URL, params={
+            "key": GOOGLE_MAPS_API_KEY, "query": f"{keyword} in {city}"
+        }, timeout=15).json()
+        if resp.get("status") not in ("OK", "ZERO_RESULTS"):
+            return jsonify({"error": resp.get("error_message", resp.get("status"))}), 403
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    results = []
+    for place in resp.get("results", [])[:20]:
+        pid = place.get("place_id", "")
+        # Quick details only
+        try:
+            det = requests.get(PLACES_DETAIL_URL, params={
+                "key": GOOGLE_MAPS_API_KEY, "place_id": pid,
+                "fields": "name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,types"
+            }, timeout=10).json().get("result", {})
+        except Exception:
+            det = {}
+        time.sleep(0.3)
+        website = det.get("website", "") or ""
+        email = ""
+        if website:
+            domain = website.replace("https://","").replace("http://","").split("/")[0]
+            if domain.startswith("www."): domain = domain[4:]
+            email = f"info@{domain}"
+
+        results.append({
+            "place_id":   pid,
+            "name":       det.get("name") or place.get("name", ""),
+            "email":      email,
+            "phone":      det.get("formatted_phone_number", ""),
+            "website":    website,
+            "address":    det.get("formatted_address", ""),
+            "city":       city,
+            "country":    city.split(",")[-1].strip(),
+            "category":   ", ".join(place.get("types", [])[:3]),
+            "rating":     place.get("rating", 0),
+            "reviews":    place.get("user_ratings_total", 0),
+            "maps_url":   f"https://www.google.com/maps/place/?q=place_id:{pid}",
+            "has_email":  bool(email),
+        })
+
+    # Check which are already in our DB
+    if results:
+        place_ids = [r["place_id"] for r in results]
+        conn = get_db()
+        placeholders = ",".join("?" * len(place_ids))
+        existing = {r["place_id"] for r in conn.execute(
+            f"SELECT place_id FROM leads WHERE place_id IN ({placeholders})", place_ids).fetchall()}
+        conn.close()
+        for r in results:
+            r["already_saved"] = r["place_id"] in existing
+    return jsonify({"results": results, "found": len(results)})
+
+
+@app.route("/api/search/save_selected", methods=["POST"])
+def search_save_selected():
+    """Save selected leads from search preview (after user picks them)."""
+    data = request.json or {}
+    leads = data.get("leads", [])
+    if not leads: return jsonify({"error": "no leads"}), 400
+
+    conn = get_db()
+    saved = 0
+    saved_ids = []
+    for r in leads:
+        try:
+            cur = conn.execute("""INSERT OR IGNORE INTO leads
+                (name,email,phone,website,address,city,country,category,rating,reviews,place_id,maps_url,source,status)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'searched','new')""",
+                [r.get("name",""), r.get("email",""), r.get("phone",""), r.get("website",""),
+                 r.get("address",""), r.get("city",""), r.get("country",""),
+                 r.get("category",""), r.get("rating",0), r.get("reviews",0),
+                 r.get("place_id",""), r.get("maps_url","")])
+            if cur.rowcount:
+                saved += 1
+                saved_ids.append(cur.lastrowid)
+        except Exception: pass
+    conn.commit(); conn.close()
+    return jsonify({"saved": saved, "lead_ids": saved_ids})
+
+
+# ─────────────────────────────────────────────
+# OPEN / CLICK TRACKING ENDPOINTS
+# ─────────────────────────────────────────────
+from flask import redirect, Response
+
+_TRACKING_PIXEL = bytes([
+    0x47,0x49,0x46,0x38,0x39,0x61,0x01,0x00,0x01,0x00,0x80,0x00,0x00,
+    0xff,0xff,0xff,0x00,0x00,0x00,0x21,0xf9,0x04,0x01,0x00,0x00,0x00,
+    0x00,0x2c,0x00,0x00,0x00,0x00,0x01,0x00,0x01,0x00,0x00,0x02,0x02,
+    0x44,0x01,0x00,0x3b
+])
+
+@app.route("/track/open/<int:log_id>.png")
+def track_open(log_id):
+    try:
+        ua = (request.headers.get("User-Agent", "") or "")[:200]
+        ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "")[:50]
+        conn = get_db()
+        row = conn.execute("SELECT lead_id FROM email_log WHERE id=?", [log_id]).fetchone()
+        lead_id = row["lead_id"] if row else None
+        is_proxy = any(b in ua.lower() for b in ["googleimageproxy", "googlebot", "yahoo", "bot"])
+        conn.execute("""INSERT INTO tracking_events (log_id, lead_id, event_type, ip, user_agent)
+                        VALUES (?, ?, ?, ?, ?)""",
+                     [log_id, lead_id, "open_proxy" if is_proxy else "open", ip, ua])
+        # If real open (not proxy), update lead status
+        if not is_proxy and lead_id:
+            conn.execute("""UPDATE leads SET status='opened'
+                WHERE id=? AND status NOT IN ('replied','qualified','interested','clicked')""",
+                [lead_id])
+        conn.commit(); conn.close()
+    except Exception as e:
+        print(f"[track-open] {e}")
+    resp = Response(_TRACKING_PIXEL, mimetype="image/gif")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+    return resp
+
+
+@app.route("/track/click/<int:log_id>")
+def track_click(log_id):
+    url = request.args.get("url", "")
+    if not url or not (url.startswith("http://") or url.startswith("https://")):
+        return "Invalid URL", 400
+    try:
+        ua = (request.headers.get("User-Agent", "") or "")[:200]
+        ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "")[:50]
+        conn = get_db()
+        row = conn.execute("SELECT lead_id FROM email_log WHERE id=?", [log_id]).fetchone()
+        lead_id = row["lead_id"] if row else None
+        conn.execute("""INSERT INTO tracking_events (log_id, lead_id, event_type, url, ip, user_agent)
+                        VALUES (?, ?, 'click', ?, ?, ?)""",
+                     [log_id, lead_id, url[:500], ip, ua])
+        if lead_id:
+            conn.execute("""UPDATE leads SET status='clicked'
+                WHERE id=? AND status NOT IN ('replied','qualified','interested')""", [lead_id])
+        conn.commit(); conn.close()
+    except Exception as e:
+        print(f"[track-click] {e}")
+    return redirect(url, code=302)
+
+
+# ─────────────────────────────────────────────
+# ANALYTICS
+# ─────────────────────────────────────────────
+@app.route("/api/analytics/summary")
+def analytics_summary():
+    conn = get_db()
+    sent      = conn.execute("SELECT COUNT(*) FROM email_log WHERE status='success'").fetchone()[0]
+    opens_u   = conn.execute("SELECT COUNT(DISTINCT log_id) FROM tracking_events WHERE event_type='open'").fetchone()[0]
+    clicks_u  = conn.execute("SELECT COUNT(DISTINCT log_id) FROM tracking_events WHERE event_type='click'").fetchone()[0]
+    replied   = conn.execute("SELECT COUNT(*) FROM leads WHERE replied=1").fetchone()[0]
+    failed    = conn.execute("SELECT COUNT(*) FROM email_log WHERE status='failed'").fetchone()[0]
+    conn.close()
+    pct = lambda n, d: round(n*100.0/d, 1) if d else 0
+    return jsonify({
+        "sent": sent, "delivered": sent-failed, "failed": failed,
+        "opens_unique": opens_u, "clicks_unique": clicks_u, "replies": replied,
+        "open_rate":  pct(opens_u, sent),
+        "click_rate": pct(clicks_u, sent),
+        "reply_rate": pct(replied, sent),
+    })
+
+
+@app.route("/api/analytics/by_step")
+def analytics_by_step():
+    conn = get_db()
+    rows = []
+    for step in range(1, 6):
+        sent = conn.execute("SELECT COUNT(*) FROM email_log WHERE step=? AND status='success'", [step]).fetchone()[0]
+        opens = conn.execute("""SELECT COUNT(DISTINCT te.log_id) FROM tracking_events te
+            JOIN email_log el ON te.log_id=el.id WHERE el.step=? AND te.event_type='open'""", [step]).fetchone()[0]
+        clicks = conn.execute("""SELECT COUNT(DISTINCT te.log_id) FROM tracking_events te
+            JOIN email_log el ON te.log_id=el.id WHERE el.step=? AND te.event_type='click'""", [step]).fetchone()[0]
+        pct = lambda n, d: round(n*100.0/d, 1) if d else 0
+        rows.append({
+            "step": step, "name": SEQUENCE_TEMPLATES[step-1]["name"],
+            "sent": sent, "opens": opens, "clicks": clicks,
+            "open_rate": pct(opens, sent), "click_rate": pct(clicks, sent),
+        })
+    conn.close()
+    return jsonify({"by_step": rows})
 
 
 # ── CONFIG STATUS ──
