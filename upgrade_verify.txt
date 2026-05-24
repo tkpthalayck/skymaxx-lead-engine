@@ -1,0 +1,12 @@
+OK / -> HTTP 200 | <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="view
+OK /api/config -> HTTP 200 | {"bcc_support":true,"daily_limit":300,"from_email":"noreply@skymaxx.company","fr
+OK /api/prospecting/templates -> HTTP 200 | [{"id":"it_services","keyword":"IT services company","label":"IT Services & MSPs
+OK /api/sequence/preview/1?name=Test -> HTTP 200 | {"body":"<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f3f4f
+OK /api/sequence/templates -> HTTP 200 | [{"body":"<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f3f4
+
+Config keys: bcc_support, daily_limit, from_email, from_name, google_maps, graph_api, mailbox, reply_to, zepto_mail
+bcc_support: True
