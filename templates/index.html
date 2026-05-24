@@ -1176,7 +1176,7 @@ function renderQSResults() {
       '<div class="sr-info">' +
         '<div class="name">' + escapeHtml(r.name) + '</div>' +
         '<div class="meta">' +
-          (r.email ? '<span><i class="fas fa-envelope"></i><span style="color:' + (r.email_source==='scraped'?'#34d399':'#fbbf24') + '">' + r.email + '</span>' + (r.email_source==='scraped'?' <span title="Real email found on website" style="color:#34d399;font-size:9px">✓ verified</span>':' <span title="Generated guess (info@domain)" style="color:#fbbf24;font-size:9px">⚠ guess</span>') + '</span>' : '<span style="color:var(--red)"><i class="fas fa-envelope-open"></i>no email</span>') +
+          (r.email_source === 'pending' ? '<span style="color:var(--muted)"><i class="fas fa-spinner fa-spin"></i> scraping...</span>' : r.email_source === 'failed' ? '<span style="color:var(--red)"><i class="fas fa-exclamation-triangle"></i>scrape failed</span>' : r.email ? '<span><i class="fas fa-envelope"></i><span style="color:' + (r.email_source==='scraped'?'#34d399':'#fbbf24') + '">' + r.email + '</span>' + (r.email_source==='scraped'?' <span title="Real email found on website" style="color:#34d399;font-size:9px">✓ verified</span>':' <span title="Generated guess (info@domain)" style="color:#fbbf24;font-size:9px">⚠ guess</span>') + '</span>' : '<span style="color:var(--red)"><i class="fas fa-envelope-open"></i>no email</span>') +
           (r.phone ? '<span><i class="fas fa-phone"></i>' + r.phone + '</span>' : '') +
           (r.website ? '<span><i class="fas fa-globe"></i><a href="' + r.website + '" target="_blank" style="color:var(--accent2);text-decoration:none">' + webShort + '</a></span>' : '') +
           (r.rating ? '<span><i class="fas fa-star" style="color:#f59e0b"></i>' + r.rating + ' (' + r.reviews + ')</span>' : '') +
@@ -1404,7 +1404,7 @@ async function quickSearchV2() {
 
   const btn = document.getElementById('qs-btn');
   btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>';
-  document.getElementById('qs-status').innerHTML = '<div class="alert alert-info"><div class="spinner"></div><div><strong>Searching Google Maps + scraping real emails from business websites...</strong> This takes 15-30 seconds per search.</div></div>';
+  document.getElementById('qs-status').innerHTML = '<div class="alert alert-info"><div class="spinner"></div><div>Searching Google Maps...</div></div>';
 
   try {
     const r = await fetch('/api/search/v2/preview', {
@@ -1423,6 +1423,8 @@ async function quickSearchV2() {
     document.getElementById('qs-status').innerHTML = statusHtml;
     renderQSResults();
     document.getElementById('qs-results-card').style.display = 'block';
+    // Kick off email enrichment in background
+    enrichEmailsInBackground();
   } catch(e) {
     btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Search';
     document.getElementById('qs-status').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
