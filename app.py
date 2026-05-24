@@ -1922,7 +1922,7 @@ def search_v2_enrich_emails():
     # Build minimal dicts for parallel scraping
     work = [{"place_id": l.get("place_id",""), "website": l.get("website","")} for l in leads]
     # Parallel scrape — should take ~5-15s for 8 leads
-    enriched = enrich_leads_parallel(work, max_workers=8)
+    enriched = enrich_leads_parallel(work, max_workers=4)
 
     out = {}
     for e in enriched:
@@ -2081,7 +2081,7 @@ def search_v2_save_selected():
     # Scrape emails for any lead missing a real email
     leads_needing_email = [l for l in leads if not l.get("email") and l.get("website")]
     if leads_needing_email:
-        enriched = enrich_leads_parallel(leads_needing_email, max_workers=10)
+        enriched = enrich_leads_parallel(leads_needing_email, max_workers=4)
         # Merge back
         by_pid = {l["place_id"]: l for l in enriched if l.get("place_id")}
         for r in leads:
@@ -2172,34 +2172,49 @@ def _pick_best_email(emails, target_domain=None):
     seen.sort(key=score, reverse=True)
     return seen[0]
 
-def scrape_emails_from_website(website, timeout=5):
-    """Visit homepage + contact pages, return list of valid emails found."""
+def scrape_emails_from_website(website, per_url_timeout=4):
+    """Visit homepage + contact, return list of emails. Streams response to cap memory."""
     if not website: return []
     if not website.startswith(('http://','https://')):
         website = 'https://' + website
     base = website.rstrip('/')
-    urls = [base, base + '/contact', base + '/contact-us', base + '/about', base + '/about-us']
+    urls = [base, base + '/contact']  # only 2 URLs for speed
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate',
     }
     all_emails = []
+    MAX_BYTES = 200_000
     for url in urls:
         try:
-            r = requests.get(url, timeout=timeout, headers=headers, allow_redirects=True, verify=False)
-            if r.status_code != 200: continue
-            text = r.text[:300_000]  # cap to 300KB
+            r = requests.get(url, timeout=per_url_timeout, headers=headers, allow_redirects=True,
+                             verify=False, stream=True)
+            if r.status_code != 200:
+                r.close(); continue
+            # Stream-read up to MAX_BYTES
+            buf = b""
+            for chunk in r.iter_content(chunk_size=16384):
+                if not chunk: continue
+                buf += chunk
+                if len(buf) >= MAX_BYTES: break
+            r.close()
+            try:
+                text = buf.decode('utf-8', errors='ignore')
+            except Exception:
+                text = ""
+            if not text: continue
             found = _EMAIL_RE.findall(text)
-            # Also check mailto: links specifically (most reliable)
             mailtos = _re.findall(r'mailto:([^"\'\s>?]+)', text)
             for e in mailtos + found:
                 ne = _normalize_email(e)
                 if _is_valid_email(ne) and ne not in all_emails:
                     all_emails.append(ne)
-            # Stop if we already found a few good candidates on homepage
-            if len(all_emails) >= 5 and url == base: break
+            if len(all_emails) >= 5 and url == base: break  # enough from homepage
         except Exception:
+            try: r.close()
+            except: pass
             continue
     return all_emails
 
@@ -2230,7 +2245,7 @@ def enrich_lead_with_email(lead):
     return lead
 
 
-def enrich_leads_parallel(leads, max_workers=10):
+def enrich_leads_parallel(leads, max_workers=4):
     """Enrich emails for many leads in parallel. Preserves order."""
     if not leads: return leads
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
