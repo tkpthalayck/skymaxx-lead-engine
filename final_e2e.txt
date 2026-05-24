@@ -1,0 +1,25 @@
+=== FINAL E2E TEST (after bug fixes) ===
+Search: HTTP 200 in 9.4s
+Found 20 businesses with 20 websites
+Batch 1: OK 4.3s  scraped=2 generated=2
+Batch 2: OK 6.8s  scraped=3 generated=1
+Batch 3: OK 5.3s  scraped=2 generated=2
+Batch 4: OK 7.9s  scraped=4 generated=0
+Batch 5: FAIL 4.9s  {'error': 'HTTP Error 502: Bad Gateway'}
+
+=== RESULTS: 4 batches OK, 1 failed ===
+Verified emails (scraped from real websites): 11
+Generated fallback (info@domain):              5
+
+Real email samples:
+  Peniel Technology LLC -> info@penieltech.com
+  Meridian IT Solutions | Website Des -> info@meridianuae.com
+  Inlogic IT Solutions LLC -> sales@inlogic.ae
+  D Tech IT Solutions -> info@dtechitsolutions.com
+  Netlogix Information Technology LLC -> leads@net-logix.com
+  Castle IT Solutions -> praveen@castleitsolutions.com
+  Cloud Tech IT Solutions L.L.C -> eben@eyebytes.com
+  Telelogix IT Services -> info@telelogix.net
+  ToXSL Technologies -> sales@toxsl.ae
+  Tally Solutions Private Limited -> support@tallysolutions.com
+  FACTS ERP Software House L.L.C -> info@facts.ae
