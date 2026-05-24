@@ -1585,6 +1585,383 @@ async function qsCreateCampaign() {
   qsSelected.clear();
 }
 
+
+// ─────────────────────────────────────────────
+// CAMPAIGN APPROVAL MODAL + ACTIONS (was missing - critical fix)
+// ─────────────────────────────────────────────
+if (typeof currentCampaignId === 'undefined') { window.currentCampaignId = null; }
+
+function showApprovalModal(c) {
+  const riskClass = c.risk_score < 30 ? 'risk-low' : c.risk_score < 60 ? 'risk-med' : 'risk-high';
+  const riskLabel = c.risk_score < 30 ? 'Low Risk' : c.risk_score < 60 ? 'Medium Risk' : 'High Risk';
+  const dh = c.domain_health || {};
+  const seqHtml = (c.sequence_steps || []).map(s =>
+    '<div class="mini-step">' +
+      '<div class="mini-step-num">' + s.step + '</div>' +
+      '<div style="flex:1">' +
+        '<div style="color:#fff;font-weight:500">' + escapeHtml(s.name) + '</div>' +
+        '<div style="color:var(--muted);font-size:11px">' + escapeHtml(s.subject) + '</div>' +
+      '</div>' +
+      '<div style="color:var(--muted);font-size:11px">Day +' + s.day + '</div>' +
+    '</div>'
+  ).join('');
+  const samplesHtml = (c.sample_leads || []).map(l =>
+    '<div class="lead"><strong>' + escapeHtml(l.name || '?') + '</strong> &middot; ' +
+    escapeHtml(l.email || '(no email)') + ' &middot; ' + escapeHtml(l.city || '') + '</div>'
+  ).join('') || '<div style="color:var(--muted);font-size:12px">No samples available</div>';
+
+  const body = document.getElementById('approval-body');
+  if (!body) {
+    alert('Approval modal not found in page. Please refresh.');
+    return;
+  }
+  body.innerHTML =
+    '<div>' +
+      '<div class="approval-section">' +
+        '<h4><i class="fas fa-file-lines"></i> Campaign Details</h4>' +
+        '<div class="approval-row"><span class="k">Name</span><span class="v">' + escapeHtml(c.name || '') + '</span></div>' +
+        '<div class="approval-row"><span class="k">Summary</span><span class="v" style="font-size:12px;text-align:right;max-width:60%">' + escapeHtml(c.summary || '') + '</span></div>' +
+        (c.schedule_starts ? '<div class="approval-row"><span class="k">Schedule Starts</span><span class="v">' + new Date(c.schedule_starts).toLocaleString() + '</span></div>' : '') +
+        (c.schedule_ends ? '<div class="approval-row"><span class="k">Schedule Ends</span><span class="v">' + new Date(c.schedule_ends).toLocaleString() + '</span></div>' : '') +
+      '</div>' +
+      '<div class="approval-section mt-2">' +
+        '<h4><i class="fas fa-stream"></i> Email Sequence (5 steps over 21 days)</h4>' +
+        seqHtml +
+      '</div>' +
+      '<div class="approval-section mt-2">' +
+        '<h4><i class="fas fa-users"></i> Sample Recipients (showing 5 of ' + c.recipient_count + ')</h4>' +
+        '<div class="sample-leads">' + samplesHtml + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div>' +
+      '<div class="approval-section">' +
+        '<h4><i class="fas fa-users"></i> Recipients</h4>' +
+        '<div class="big-number">' + c.recipient_count + '</div>' +
+        '<div class="label-sub">prospects will receive 5 emails each</div>' +
+        '<div class="label-sub" style="margin-top:6px"><strong>Total emails: ' + (c.recipient_count * 5) + '</strong></div>' +
+      '</div>' +
+      '<div class="approval-section mt-2">' +
+        '<h4><i class="fas fa-triangle-exclamation"></i> Risk Assessment</h4>' +
+        '<div class="big-number" style="color:' + (riskClass==='risk-low'?'var(--green)':riskClass==='risk-med'?'var(--gold)':'var(--red)') + '">' + c.risk_score + '<span style="font-size:14px;color:var(--muted)">/100</span></div>' +
+        '<div class="risk-meter"><div class="risk-meter-fill ' + riskClass + '" style="width:' + c.risk_score + '%"></div></div>' +
+        '<div class="label-sub">' + riskLabel + '</div>' +
+        ((c.risk_notes && c.risk_notes.length) ? '<div style="margin-top:8px;font-size:11px;color:var(--muted)">' + c.risk_notes.map(n => '&bull; ' + escapeHtml(n)).join('<br/>') + '</div>' : '') +
+      '</div>' +
+      '<div class="approval-section mt-2">' +
+        '<h4><i class="fas fa-chart-line"></i> Estimated Performance</h4>' +
+        '<div class="approval-row"><span class="k">Open Rate</span><span class="v" style="color:var(--accent2)">~' + c.est_open_rate + '%</span></div>' +
+        '<div class="approval-row"><span class="k">Reply Rate</span><span class="v" style="color:var(--green)">~' + c.est_reply_rate + '%</span></div>' +
+        '<div class="approval-row"><span class="k">Expected Replies</span><span class="v">' + Math.round(c.recipient_count * c.est_reply_rate / 100) + '</span></div>' +
+      '</div>' +
+      '<div class="approval-section mt-2">' +
+        '<h4><i class="fas fa-shield-halved"></i> Deliverability</h4>' +
+        '<div class="health-indicator ' + (dh.spf && dh.spf.status==='ok'?'health-ok':(dh.spf && dh.spf.status==='warning'?'health-warn':'health-bad')) + '">' +
+          '<i class="fas fa-' + (dh.spf && dh.spf.status==='ok'?'check':'exclamation-triangle') + '"></i> SPF: ' + ((dh.spf && dh.spf.status) || 'unknown') +
+        '</div>' +
+        '<div class="health-indicator ' + (dh.dkim && dh.dkim.status==='ok'?'health-ok':'health-warn') + '">' +
+          '<i class="fas fa-' + (dh.dkim && dh.dkim.status==='ok'?'check':'exclamation-triangle') + '"></i> DKIM: ' + ((dh.dkim && dh.dkim.status) || 'unknown') +
+        '</div>' +
+        '<div class="health-indicator ' + (dh.dmarc && dh.dmarc.status==='ok'?'health-ok':'health-warn') + '">' +
+          '<i class="fas fa-' + (dh.dmarc && dh.dmarc.status==='ok'?'check':'exclamation-triangle') + '"></i> DMARC: ' + ((dh.dmarc && dh.dmarc.status) || 'unknown') +
+        '</div>' +
+        '<div class="label-sub" style="margin-top:6px">Health Score: ' + (dh.score || 0) + '/100</div>' +
+      '</div>' +
+    '</div>';
+
+  const modal = document.getElementById('approval-modal');
+  if (modal) modal.classList.add('show');
+}
+
+function closeApprovalModal() {
+  const modal = document.getElementById('approval-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+async function campaignAction(action) {
+  if (!currentCampaignId) { alert('No campaign selected'); return; }
+  if (action === 'approve') {
+    if (!confirm('Approve this campaign?\n\nEmail 1 will be sent immediately. Emails 2-5 will follow automatically over the next 21 days.\nYou can Pause/Stop the campaign anytime from the Campaigns tab.')) return;
+    const r = await fetch('/api/campaigns/' + currentCampaignId + '/approve', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'
+    }).then(r=>r.json());
+    if (r.approved) {
+      alert('✓ Campaign approved!\n\n' + r.enrolled + ' leads enrolled in the sequence.\nThe scheduler will start sending Email 1 within 60 seconds.');
+      closeApprovalModal();
+      if (typeof selected !== 'undefined') selected.clear();
+      if (typeof loadStats === 'function') loadStats();
+      if (typeof loadLeads === 'function') loadLeads(typeof leadsPage !== 'undefined' ? leadsPage : 1);
+    } else {
+      alert('Failed: ' + (r.error || 'unknown error'));
+    }
+  } else if (action === 'reject') {
+    const reason = prompt('Reason for rejection (optional):', '');
+    await fetch('/api/campaigns/' + currentCampaignId + '/reject', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({reason})
+    });
+    alert('Campaign rejected');
+    closeApprovalModal();
+  } else if (action === 'modify') {
+    await fetch('/api/campaigns/' + currentCampaignId + '/modify', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'
+    });
+    alert('Campaign moved to drafts');
+    closeApprovalModal();
+    tab('campaigns', document.querySelector('[onclick*=campaigns]'));
+  }
+}
+
+// ─────────────────────────────────────────────
+// CAMPAIGNS TAB — list, review, pause/resume/stop
+// ─────────────────────────────────────────────
+async function loadCampaigns() {
+  const r = await fetch('/api/campaigns').then(r=>r.json());
+  const tb = document.getElementById('campaigns-tb');
+  if (!tb) return;
+  if (!r.campaigns || !r.campaigns.length) {
+    tb.innerHTML = '<tr><td colspan="7"><div class="empty"><i class="fas fa-rocket"></i><p>No campaigns yet</p></div></td></tr>';
+    return;
+  }
+  const sb = {
+    pending_approval: '<span class="badge badge-seq">⏸ Pending Approval</span>',
+    approved:         '<span class="badge badge-replied">▶ Active</span>',
+    paused:           '<span class="badge badge-seq">⏸ Paused</span>',
+    stopped:          '<span class="badge badge-failed">■ Stopped</span>',
+    rejected:         '<span class="badge badge-failed">✗ Rejected</span>',
+    draft:            '<span class="badge badge-new">📝 Draft</span>',
+    completed:        '<span class="badge badge-done">✓ Completed</span>',
+  };
+  tb.innerHTML = r.campaigns.map(c => {
+    let actions = '';
+    if (c.status === 'pending_approval') {
+      actions = '<button class="btn btn-purple btn-xs" onclick="reopenApproval(' + c.id + ')"><i class="fas fa-eye"></i> Review &amp; Approve</button>';
+    } else if (c.status === 'approved') {
+      actions = '<button class="btn btn-outline btn-xs" onclick="campaignPause(' + c.id + ')"><i class="fas fa-pause"></i> Pause</button> ' +
+                '<button class="btn btn-danger btn-xs" onclick="campaignStop(' + c.id + ')"><i class="fas fa-stop"></i> Stop</button>';
+    } else if (c.status === 'paused') {
+      actions = '<button class="btn btn-success btn-xs" onclick="campaignResume(' + c.id + ')"><i class="fas fa-play"></i> Resume</button> ' +
+                '<button class="btn btn-danger btn-xs" onclick="campaignStop(' + c.id + ')"><i class="fas fa-stop"></i> Stop</button>';
+    }
+    return '<tr>' +
+      '<td><strong>' + escapeHtml(c.name) + '</strong><br/><span style="font-size:11px;color:var(--muted)">' + escapeHtml((c.summary || '').slice(0, 80)) + '</span></td>' +
+      '<td>' + (sb[c.status] || c.status) + '</td>' +
+      '<td>' + c.recipient_count + '</td>' +
+      '<td>' + c.risk_score + '/100</td>' +
+      '<td>~' + Math.round((c.recipient_count * (c.est_reply_rate || 0)) / 100) + '</td>' +
+      '<td style="font-size:11px;color:var(--muted)">' + new Date(c.created_at).toLocaleString() + '</td>' +
+      '<td>' + actions + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+async function reopenApproval(cid) {
+  const c = await fetch('/api/campaigns/' + cid).then(r=>r.json());
+  if (!c || c.error) { alert('Campaign not found'); return; }
+  const sequence_steps = (typeof templates !== 'undefined' && templates) ?
+    templates.map((t, i) => ({step: t.step, name: t.name, subject: t.subject, day: [0,3,7,14,21][i]})) : [];
+  const dh = {
+    spf: {status: c.spf_status},
+    dkim: {status: c.dkim_status},
+    dmarc: {status: c.dmarc_status},
+    score: (c.spf_status==='ok'?30:0) + (c.dkim_status==='ok'?30:0) + (c.dmarc_status==='ok'?30:0) + 10,
+  };
+  const data = {
+    campaign_id: c.id,
+    name: c.name,
+    summary: c.summary,
+    recipient_count: c.recipient_count,
+    schedule_starts: c.schedule_starts,
+    schedule_ends: c.schedule_starts ? new Date(new Date(c.schedule_starts).getTime() + 21*24*3600*1000).toISOString() : null,
+    risk_score: c.risk_score || 0,
+    risk_notes: (c.risk_notes || '').split(' &bull; ').filter(Boolean),
+    est_open_rate: c.est_open_rate || 0,
+    est_reply_rate: c.est_reply_rate || 0,
+    domain_health: dh,
+    sequence_steps: sequence_steps,
+    sample_leads: [],
+  };
+  currentCampaignId = c.id;
+  showApprovalModal(data);
+}
+
+async function campaignPause(cid) {
+  if (!confirm('Pause this campaign? No more emails will be sent until you resume.')) return;
+  await fetch('/api/campaigns/' + cid + '/pause', {method:'POST'});
+  loadCampaigns();
+  if (typeof loadStats === 'function') loadStats();
+}
+
+async function campaignResume(cid) {
+  if (!confirm('Resume this campaign? Scheduled sends will continue.')) return;
+  await fetch('/api/campaigns/' + cid + '/resume', {method:'POST'});
+  loadCampaigns();
+  if (typeof loadStats === 'function') loadStats();
+}
+
+async function campaignStop(cid) {
+  if (!confirm('STOP this campaign permanently?\n\nLeads will be removed from the sequence (cannot be undone).')) return;
+  await fetch('/api/campaigns/' + cid + '/stop', {method:'POST'});
+  loadCampaigns();
+  if (typeof loadStats === 'function') loadStats();
+}
+
+// ─────────────────────────────────────────────
+// CONTACT GROUPS
+// ─────────────────────────────────────────────
+async function loadGroups() {
+  const r = await fetch('/api/groups').then(r=>r.json());
+  const div = document.getElementById('groups-list');
+  if (!div) return;
+  if (!r.groups || !r.groups.length) {
+    div.innerHTML = '<div class="empty"><i class="fas fa-folder-tree"></i><p>No groups yet. Click "New Group" to create one.</p></div>';
+    return;
+  }
+  div.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">' + r.groups.map(g =>
+    '<div class="card" style="margin:0;border-left:4px solid ' + (g.color || '#3b82f6') + '">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
+        '<div>' +
+          '<div style="font-weight:600;color:#fff;font-size:15px">' + escapeHtml(g.name) + '</div>' +
+          (g.description ? '<div style="font-size:12px;color:var(--muted);margin-top:3px">' + escapeHtml(g.description) + '</div>' : '') +
+        '</div>' +
+        '<button class="btn btn-outline btn-xs" onclick="deleteGroup(' + g.id + ', \'' + escapeHtml(g.name).replace(/\'/g,'') + '\')"><i class="fas fa-trash"></i></button>' +
+      '</div>' +
+      '<div style="font-size:13px;color:var(--accent2);margin-top:8px"><i class="fas fa-users"></i> ' + g.lead_count + ' leads</div>' +
+      '<div style="margin-top:10px;display:flex;gap:6px">' +
+        '<button class="btn btn-outline btn-xs" onclick="viewGroup(' + g.id + ', \'' + escapeHtml(g.name).replace(/\'/g,'') + '\')"><i class="fas fa-eye"></i> View Leads</button>' +
+        '<button class="btn btn-primary btn-xs" onclick="campaignFromGroup(' + g.id + ', \'' + escapeHtml(g.name).replace(/\'/g,'') + '\', ' + g.lead_count + ')"><i class="fas fa-rocket"></i> Campaign</button>' +
+      '</div>' +
+    '</div>'
+  ).join('') + '</div>';
+}
+
+async function newGroup() {
+  const name = prompt('Group name:');
+  if (!name) return;
+  const desc = prompt('Description (optional):', '') || '';
+  const colors = ['#3b82f6','#a855f7','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899'];
+  const color = colors[Math.floor(Math.random()*colors.length)];
+  const r = await fetch('/api/groups', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, description: desc, color})
+  }).then(r=>r.json());
+  if (r.error) { alert(r.error); return; }
+  loadGroups();
+}
+
+async function deleteGroup(gid, name) {
+  if (!confirm('Delete group "' + name + '"? Leads will NOT be deleted, just removed from this group.')) return;
+  await fetch('/api/groups/' + gid, {method:'DELETE'});
+  loadGroups();
+}
+
+async function viewGroup(gid, name) {
+  const r = await fetch('/api/groups/' + gid + '/leads').then(r=>r.json());
+  alert('Group "' + name + '" has ' + (r.leads || []).length + ' leads:\n\n' + (r.leads || []).slice(0,20).map(l => '• ' + l.name + ' (' + (l.email||'no email') + ')').join('\n'));
+}
+
+async function campaignFromGroup(gid, name, count) {
+  if (!count) { alert('Group is empty'); return; }
+  const r = await fetch('/api/groups/' + gid + '/leads').then(r=>r.json());
+  const lead_ids = (r.leads || []).map(l => l.id);
+  if (!lead_ids.length) { alert('Group has no leads'); return; }
+  const cname = prompt('Campaign name:', name + ' Campaign ' + new Date().toLocaleDateString());
+  if (!cname) return;
+  const draft = await fetch('/api/campaigns/draft', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name: cname, lead_ids})
+  }).then(r=>r.json());
+  if (draft.error) { alert(draft.error); return; }
+  currentCampaignId = draft.campaign_id;
+  showApprovalModal(draft);
+}
+
+// ─────────────────────────────────────────────
+// AI ASSISTANT
+// ─────────────────────────────────────────────
+const AI_ACTIONS = [
+  {id:'rewrite', label:'Rewrite Email', icon:'fa-pen'},
+  {id:'improve_conversion', label:'Improve Conversion', icon:'fa-arrow-trend-up'},
+  {id:'personalize', label:'Personalize More', icon:'fa-user'},
+  {id:'make_professional', label:'More Professional', icon:'fa-tie'},
+  {id:'make_friendly', label:'More Friendly', icon:'fa-face-smile'},
+  {id:'make_technical', label:'More Technical', icon:'fa-microchip'},
+  {id:'shorten', label:'Shorten', icon:'fa-compress'},
+  {id:'expand', label:'Expand', icon:'fa-expand'},
+  {id:'grammar', label:'Grammar Check', icon:'fa-spell-check'},
+  {id:'improve_subject', label:'Better Subject Lines', icon:'fa-heading'},
+  {id:'improve_cta', label:'Stronger CTA', icon:'fa-bullhorn'},
+  {id:'improve_readability', label:'Better Readability', icon:'fa-book-open'},
+  {id:'improve_deliverability', label:'Deliverability Check', icon:'fa-paper-plane'},
+  {id:'compliance_check', label:'Compliance Audit', icon:'fa-gavel'},
+  {id:'translate_arabic', label:'Translate to Arabic', icon:'fa-language'},
+];
+
+let currentAIEmail = null;
+
+async function openAIPanel(step) {
+  if (typeof templates === 'undefined' || !templates) return;
+  const tpl = templates[step-1];
+  if (!tpl) return;
+  currentAIEmail = {step, subject: tpl.subject, body: tpl.body};
+  const ctx = document.getElementById('ai-context');
+  if (ctx) ctx.textContent = 'Step ' + step + ': ' + tpl.name;
+  const grid = document.getElementById('ai-actions-grid');
+  if (grid) grid.innerHTML = AI_ACTIONS.map(a =>
+    '<button class="ai-action" onclick="runAIAction(\'' + a.id + '\')"><i class="fas ' + a.icon + '"></i>' + a.label + '</button>'
+  ).join('');
+
+  try {
+    const status = await fetch('/api/ai/status').then(r=>r.json());
+    const notConfig = document.getElementById('ai-not-configured');
+    if (notConfig) notConfig.style.display = status.configured ? 'none' : 'flex';
+  } catch(e) {}
+
+  const wrap = document.getElementById('ai-result-wrapper');
+  if (wrap) wrap.style.display = 'none';
+  const modal = document.getElementById('ai-modal');
+  if (modal) modal.classList.add('show');
+}
+
+function closeAIPanel() {
+  const modal = document.getElementById('ai-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+async function runAIAction(action) {
+  if (!currentAIEmail) return;
+  const wrap = document.getElementById('ai-result-wrapper');
+  if (wrap) wrap.style.display = 'block';
+  const res = document.getElementById('ai-result');
+  if (res) res.innerHTML = '<div class="spinner"></div> Running AI...';
+
+  const r = await fetch('/api/ai/edit_email', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      action,
+      subject: currentAIEmail.subject,
+      body: currentAIEmail.body,
+    })
+  }).then(r=>r.json()).catch(e => ({error: e.message}));
+
+  if (!res) return;
+  if (r.error) {
+    res.innerHTML = '<div style="color:var(--red)">⚠ ' + escapeHtml(r.error) + '</div>' +
+      (r.message ? '<div style="margin-top:8px;color:var(--muted);font-size:12px">' + escapeHtml(r.message) + '</div>' : '');
+  } else {
+    res.textContent = r.result || '(empty result)';
+  }
+}
+
+// ─────────────────────────────────────────────
+// init2 — populate quick search city/preset dropdowns (legacy helper)
+// ─────────────────────────────────────────────
+async function init2() {
+  // Most quick-search elements are now populated by initV2Search.
+  // Keep this stub for compatibility with any stale setTimeout references.
+}
+
+
 setTimeout(initV2Search, 1800);
 
 init();
