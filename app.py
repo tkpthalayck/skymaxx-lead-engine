@@ -22,6 +22,7 @@ ZEPTO_TOKEN         = os.getenv("ZEPTO_TOKEN", "")
 FROM_EMAIL          = os.getenv("FROM_EMAIL", "noreply@skymaxx.company")
 FROM_NAME           = os.getenv("FROM_NAME", "SKYMAXX Support Team")
 REPLY_TO            = os.getenv("REPLY_TO", "support@skymaxx.company")
+BCC_SUPPORT         = os.getenv("BCC_SUPPORT", "true").lower() == "true"  # BCC support@ on all sends
 DAILY_SEND_LIMIT    = int(os.getenv("DAILY_SEND_LIMIT", "300"))
 DB_PATH             = os.getenv("DB_PATH", "skymaxx.db")
 
@@ -200,6 +201,8 @@ def send_via_zepto(to_email, to_name, subject, html_body):
         "subject":  subject,
         "htmlbody": html_body
     }
+    if BCC_SUPPORT and to_email.lower() != REPLY_TO.lower():
+        payload["bcc"] = [{"email_address": {"address": REPLY_TO, "name": "SKYMAXX (BCC)"}}]
     try:
         r = requests.post(ZEPTO_API_URL, headers=headers, json=payload, timeout=15)
         if r.status_code in (200, 201):
@@ -285,6 +288,7 @@ def stats():
         "replied":      conn.execute("SELECT COUNT(*) FROM leads WHERE replied=1").fetchone()[0],
         "today_sent":   get_todays_send_count(),
         "daily_limit":  DAILY_SEND_LIMIT,
+        "bcc_support":  BCC_SUPPORT,
         "total_sent":   conn.execute("SELECT COUNT(*) FROM email_log WHERE status='success'").fetchone()[0],
         "total_failed": conn.execute("SELECT COUNT(*) FROM email_log WHERE status='failed'").fetchone()[0],
     }
@@ -657,6 +661,185 @@ def set_step():
     return jsonify({"updated": updated, "next_send_at": next_at, "next_step": next_step})
 
 
+
+# ── EMAIL LOG DETAIL (for previewing sent emails) ──
+@app.route("/api/email_log/<int:log_id>")
+def email_log_detail(log_id):
+    conn = get_db()
+    row = conn.execute("""SELECT el.*, l.name AS lead_name, l.email AS lead_email, l.city AS lead_city
+        FROM email_log el LEFT JOIN leads l ON el.lead_id = l.id WHERE el.id=?""",
+        [log_id]).fetchone()
+    conn.close()
+    if not row: return jsonify({"error": "not found"}), 404
+
+    # Reconstruct the email body using template + lead data for preview
+    log = dict(row)
+    body_html = ""
+    if log.get("step") and 1 <= log["step"] <= 5:
+        tpl = SEQUENCE_TEMPLATES[log["step"] - 1]
+        # Build a minimal lead dict to personalize
+        lead_for_preview = {
+            "name":    log.get("lead_name") or "there",
+            "city":    log.get("lead_city") or "",
+        }
+        body_html = personalize(tpl["body"], lead_for_preview)
+    log["body_preview"] = body_html
+    return jsonify(log)
+
+
+# ── TEMPLATE PREVIEW (render a template with custom name) ──
+@app.route("/api/sequence/preview/<int:step>")
+def template_preview(step):
+    if not (1 <= step <= len(SEQUENCE_TEMPLATES)):
+        return jsonify({"error": "invalid step"}), 400
+    name = request.args.get("name", "Sarah Johnson")
+    tpl = SEQUENCE_TEMPLATES[step - 1]
+    fake_lead = {"name": name, "city": "Dubai", "website": "example.com"}
+    return jsonify({
+        "step":    tpl["step"],
+        "subject": personalize(tpl["subject"], fake_lead),
+        "body":    personalize(tpl["body"], fake_lead),
+        "from_email": FROM_EMAIL,
+        "from_name":  FROM_NAME,
+    })
+
+
+# ── SEND TEST EMAIL ──
+@app.route("/api/sequence/send_test", methods=["POST"])
+def send_test_email():
+    data = request.json or {}
+    step      = int(data.get("step", 1))
+    to_email  = (data.get("email") or "").strip()
+    test_name = data.get("name", "Test User")
+    if not to_email or "@" not in to_email:
+        return jsonify({"error": "invalid email"}), 400
+    if not (1 <= step <= len(SEQUENCE_TEMPLATES)):
+        return jsonify({"error": "invalid step"}), 400
+    tpl = SEQUENCE_TEMPLATES[step - 1]
+    fake_lead = {"name": test_name, "city": "Dubai"}
+    subject = "[TEST] " + personalize(tpl["subject"], fake_lead)
+    body    = personalize(tpl["body"], fake_lead)
+    ok, err = send_via_zepto(to_email, test_name, subject, body)
+    return jsonify({"sent": ok, "error": err})
+
+
+# ── BULK DELETE LEADS ──
+@app.route("/api/leads/bulk_delete", methods=["POST"])
+def bulk_delete_leads():
+    data = request.json or {}
+    ids = data.get("lead_ids", [])
+    if not ids: return jsonify({"deleted": 0})
+    conn = get_db()
+    placeholders = ",".join("?" * len(ids))
+    conn.execute(f"DELETE FROM leads WHERE id IN ({placeholders})", ids)
+    conn.commit()
+    deleted = conn.execute("SELECT changes()").fetchone()[0]
+    conn.close()
+    return jsonify({"deleted": deleted})
+
+
+# ── DELETE LEADS WITHOUT EMAIL ──
+@app.route("/api/leads/clean_no_email", methods=["POST"])
+def clean_no_email():
+    conn = get_db()
+    conn.execute("DELETE FROM leads WHERE email IS NULL OR email = ''")
+    conn.commit()
+    deleted = conn.execute("SELECT changes()").fetchone()[0]
+    conn.close()
+    return jsonify({"deleted": deleted})
+
+
+# ── PROSPECTING TEMPLATES (pre-built searches) ──
+PROSPECTING_TEMPLATES = [
+    {"id": "it_services",  "label": "IT Services & MSPs",      "keyword": "IT services company"},
+    {"id": "consulting",   "label": "Consulting Firms",        "keyword": "business consulting firm"},
+    {"id": "real_estate",  "label": "Real Estate Agencies",    "keyword": "real estate agency"},
+    {"id": "marketing",    "label": "Marketing Agencies",      "keyword": "digital marketing agency"},
+    {"id": "law",          "label": "Law Firms",               "keyword": "law firm"},
+    {"id": "accounting",   "label": "Accounting Firms",        "keyword": "accounting firm"},
+    {"id": "manufacturing","label": "Manufacturing Companies", "keyword": "manufacturing company"},
+    {"id": "retail",       "label": "Retail Businesses",       "keyword": "retail store"},
+    {"id": "healthcare",   "label": "Healthcare Clinics",      "keyword": "medical clinic"},
+    {"id": "education",    "label": "Schools & Training",      "keyword": "training institute"},
+    {"id": "construction", "label": "Construction Firms",      "keyword": "construction company"},
+    {"id": "logistics",    "label": "Logistics & Shipping",    "keyword": "logistics company"},
+    {"id": "trading",      "label": "Trading Companies",       "keyword": "trading company"},
+    {"id": "hospitality",  "label": "Hotels & Restaurants",    "keyword": "hotel"},
+    {"id": "automotive",   "label": "Automotive Businesses",   "keyword": "auto dealership"},
+    {"id": "fitness",      "label": "Fitness Centers",         "keyword": "fitness gym"},
+]
+
+@app.route("/api/prospecting/templates")
+def prospecting_templates():
+    return jsonify(PROSPECTING_TEMPLATES)
+
+
+# ── MULTI-CITY SEARCH ──
+@app.route("/api/search/multi", methods=["POST"])
+def search_multi():
+    """Search multiple cities + multiple keywords in one batch."""
+    data = request.json or {}
+    keywords = data.get("keywords", [])
+    cities   = data.get("cities", [])
+    pages    = min(int(data.get("pages", 1)), 2)
+    if not keywords or not cities:
+        return jsonify({"error": "need keywords and cities"}), 400
+    if not GOOGLE_MAPS_API_KEY:
+        return jsonify({"error": "Google Maps not configured"}), 400
+
+    all_results = []
+    total_saved = 0
+    total_dupes = 0
+    summary = []
+
+    for keyword in keywords:
+        for city in cities:
+            try:
+                resp = requests.get(PLACES_TEXT_URL,
+                    params={"key": GOOGLE_MAPS_API_KEY, "query": f"{keyword} in {city}"},
+                    timeout=15).json()
+                if resp.get("status") not in ("OK", "ZERO_RESULTS"):
+                    summary.append({"keyword": keyword, "city": city, "found": 0,
+                                    "error": resp.get("status")})
+                    continue
+                places = resp.get("results", [])[:10]  # cap at 10 per combination
+                count = 0
+                conn = get_db()
+                for place in places:
+                    pid = place.get("place_id", "")
+                    det = requests.get(PLACES_DETAIL_URL, params={
+                        "key": GOOGLE_MAPS_API_KEY, "place_id": pid,
+                        "fields": "name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,types"
+                    }, timeout=15).json().get("result", {})
+                    time.sleep(0.3)
+                    website = det.get("website", "") or ""
+                    email = ""
+                    if website:
+                        domain = website.replace("https://","").replace("http://","").split("/")[0]
+                        if domain.startswith("www."): domain = domain[4:]
+                        email = f"info@{domain}"
+                    try:
+                        conn.execute("""INSERT OR IGNORE INTO leads
+                            (name,email,phone,intl_phone,website,address,city,country,category,rating,reviews,place_id,maps_url)
+                            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            [det.get("name", place.get("name", "")), email,
+                             det.get("formatted_phone_number",""), det.get("international_phone_number",""),
+                             website, det.get("formatted_address",""), city, city.split(",")[-1].strip(),
+                             ", ".join(place.get("types", [])[:3]), place.get("rating", 0),
+                             place.get("user_ratings_total", 0), pid,
+                             f"https://www.google.com/maps/place/?q=place_id:{pid}"])
+                        if conn.execute("SELECT changes()").fetchone()[0]:
+                            total_saved += 1; count += 1
+                        else:
+                            total_dupes += 1
+                    except Exception: total_dupes += 1
+                conn.commit(); conn.close()
+                summary.append({"keyword": keyword, "city": city, "found": count, "error": None})
+            except Exception as e:
+                summary.append({"keyword": keyword, "city": city, "found": 0, "error": str(e)[:60]})
+    return jsonify({"saved": total_saved, "dupes": total_dupes, "summary": summary})
+
+
 # ── CONFIG STATUS ──
 @app.route("/api/config")
 def config_check():
@@ -667,6 +850,7 @@ def config_check():
         "from_name":    FROM_NAME,
         "reply_to":     REPLY_TO,
         "daily_limit":  DAILY_SEND_LIMIT,
+        "bcc_support":  BCC_SUPPORT,
         "graph_api":    bool(AZURE_TENANT_ID and AZURE_CLIENT_ID and AZURE_CLIENT_SECRET),
         "mailbox":      MAILBOX_EMAIL,
     })
