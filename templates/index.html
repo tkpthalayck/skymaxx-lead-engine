@@ -1225,6 +1225,80 @@ function qsSelectVerified() {
   }
 }
 
+
+// ─── Email Enrichment in Background (chunked to avoid 502) ───
+let enrichmentInProgress = false;
+async function enrichEmailsInBackground() {
+  if (enrichmentInProgress) return;
+  if (!qsResults || !qsResults.length) return;
+  enrichmentInProgress = true;
+
+  const toEnrich = qsResults.filter(r => r.website && r.email_source === 'pending');
+  if (!toEnrich.length) {
+    enrichmentInProgress = false;
+    return;
+  }
+
+  const statusEl = document.getElementById('qs-status');
+  const baseStatus = statusEl.innerHTML;
+  let done = 0;
+  function showProgress() {
+    statusEl.innerHTML = baseStatus + `<div class="alert alert-info" style="margin-top:6px"><div class="spinner"></div><div>Scraping real emails from websites: <strong>${done} / ${toEnrich.length}</strong> done...</div></div>`;
+  }
+  showProgress();
+
+  const BATCH_SIZE = 6;
+  for (let i = 0; i < toEnrich.length; i += BATCH_SIZE) {
+    const batch = toEnrich.slice(i, i + BATCH_SIZE).map(r => ({
+      place_id: r.place_id,
+      website:  r.website,
+    }));
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 55000);
+      const r = await fetch('/api/search/v2/enrich_emails', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({leads: batch}),
+        signal: ctrl.signal,
+      }).then(r=>r.json());
+      clearTimeout(t);
+      const emails = r.emails || {};
+      qsResults.forEach(q => {
+        if (emails[q.place_id]) {
+          q.email = emails[q.place_id].email || '';
+          q.email_source = emails[q.place_id].email_source || 'none';
+          q.has_email = emails[q.place_id].has_email || false;
+        }
+      });
+      done += batch.length;
+      renderQSResults();
+      showProgress();
+    } catch(e) {
+      batch.forEach(b => {
+        const q = qsResults.find(x => x.place_id === b.place_id);
+        if (q) q.email_source = 'failed';
+      });
+      done += batch.length;
+      renderQSResults();
+      showProgress();
+    }
+  }
+
+  const scraped = qsResults.filter(r => r.email_source === 'scraped').length;
+  const generated = qsResults.filter(r => r.email_source === 'generated').length;
+  const failed = qsResults.filter(r => r.email_source === 'failed').length;
+  const noWeb = qsResults.filter(r => r.email_source === 'none').length;
+  statusEl.innerHTML = baseStatus + `<div class="alert alert-success" style="margin-top:6px"><i class="fas fa-check-circle"></i><div>
+    <strong>Email enrichment complete:</strong>
+    <span style="color:#34d399;margin-left:8px"><i class="fas fa-check"></i> ${scraped} verified</span> ·
+    <span style="color:#fbbf24"><i class="fas fa-exclamation-circle"></i> ${generated} guessed</span> ·
+    <span style="color:var(--red)"><i class="fas fa-times"></i> ${failed} failed</span> ·
+    <span style="color:var(--muted)"><i class="fas fa-ban"></i> ${noWeb} no website</span>
+  </div></div>`;
+  enrichmentInProgress = false;
+}
+
 async function qsAddToGroup() {
   if (!qsSelected.size) { alert('Select at least one lead'); return; }
   const groups = await fetch('/api/groups').then(r=>r.json());
