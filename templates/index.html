@@ -213,6 +213,48 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
 .approval-warning{background:linear-gradient(135deg,rgba(168,85,247,.15) 0%,rgba(59,130,246,.15) 100%);border:1px solid rgba(168,85,247,.3);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;gap:14px;align-items:center}
 .approval-warning i{font-size:22px;color:#a855f7}
 
+
+/* Source badges */
+.src-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.src-uploaded{background:rgba(168,85,247,.18);color:#c084fc}
+.src-searched{background:rgba(59,130,246,.18);color:#60a5fa}
+.src-imported{background:rgba(6,182,212,.18);color:#22d3ee}
+.src-manual{background:rgba(100,116,139,.18);color:#94a3b8}
+
+/* Status pills */
+.status-pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase}
+.st-new{background:rgba(100,116,139,.15);color:#94a3b8}
+.st-contacted{background:rgba(245,158,11,.15);color:#fbbf24}
+.st-opened{background:rgba(6,182,212,.15);color:#22d3ee}
+.st-clicked{background:rgba(168,85,247,.15);color:#c084fc}
+.st-replied{background:rgba(16,185,129,.18);color:#34d399}
+.st-qualified{background:rgba(16,185,129,.25);color:#10b981;font-weight:700}
+.st-interested{background:rgba(16,185,129,.25);color:#10b981}
+.st-bounced{background:rgba(239,68,68,.15);color:#f87171}
+.st-unsubscribed{background:rgba(100,116,139,.2);color:#64748b}
+
+/* Group chip in lead row */
+.lead-group{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;color:#fff;margin-right:3px}
+
+/* Inline search results card */
+.search-result{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;margin-bottom:8px;transition:.15s}
+.search-result:hover{border-color:var(--accent)}
+.search-result.selected{border-color:var(--accent);background:rgba(59,130,246,.04)}
+.search-result.already{opacity:.55}
+.sr-info{min-width:0}
+.sr-info .name{font-weight:600;color:#fff;margin-bottom:3px}
+.sr-info .meta{font-size:11.5px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap}
+.sr-info .meta i{margin-right:3px;opacity:.6}
+.sr-actions{display:flex;flex-direction:column;gap:4px;align-items:flex-end;font-size:11px}
+
+/* Sticky action bar at top of search results */
+.action-bar{position:sticky;top:0;background:var(--surface);border-radius:8px;border:1px solid var(--border);padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;z-index:2;margin-bottom:10px}
+.action-bar .count{font-weight:600;color:var(--accent);margin-right:auto}
+
+/* Quick group color picker */
+.color-swatch{width:24px;height:24px;border-radius:50%;border:2px solid transparent;cursor:pointer;display:inline-block;margin-right:4px}
+.color-swatch.selected{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
+
 /* RESPONSIVE */
 @media(max-width:900px){.sidebar{display:none}.main{margin-left:0}}
 </style>
@@ -234,6 +276,7 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
     <div class="nav-section-title">Lead Generation</div>
     <div class="nav-item" onclick="tab('search', this)"><i class="fas fa-search-location"></i> Find Leads</div>
     <div class="nav-item" onclick="tab('leads', this)"><i class="fas fa-users"></i> All Leads <span id="nav-leads-count" class="nav-badge" style="display:none">0</span></div>
+    <div class="nav-item" onclick="tab('groups', this)"><i class="fas fa-folder-tree"></i> Contact Groups</div>
   </div>
 
   <div class="nav-section">
@@ -312,44 +355,77 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
       <div class="alert alert-info">
         <i class="fas fa-info-circle"></i>
         <div>
-          <strong>Smart Lead Discovery</strong> — Pick one or more business categories, select target cities, and search Google Maps in bulk. Each result auto-generates a best-guess email (info@domain) from the website.
+          <strong>Single-Page Lead Discovery</strong> — Search Google Maps, review results inline, select leads, then add them to a campaign or contact group with one click. Nothing is saved until you decide.
         </div>
       </div>
 
       <div class="card">
-        <div class="card-title"><i class="fas fa-bullseye"></i> Step 1 — Pick Business Categories <span class="right">Click chips to multi-select</span></div>
-        <div class="chip-grid" id="categories-grid"></div>
-        <div class="chip-row-actions">
-          <button class="btn btn-xs btn-outline" onclick="selectAllCategories(false)"><i class="fas fa-times"></i> Clear</button>
-          <span style="font-size:12px;color:var(--muted);align-self:center">or use custom keyword:</span>
-          <input id="custom-kw" placeholder="e.g. dental clinic" style="max-width:200px;padding:5px 10px;font-size:12px"/>
-          <button class="btn btn-xs btn-outline" onclick="addCustomCategory()"><i class="fas fa-plus"></i> Add</button>
+        <div class="card-title"><i class="fas fa-search"></i> Quick Search</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Business Type or Keyword</label>
+            <input id="qs-keyword" placeholder="e.g. IT services, dental clinic, real estate agency" oninput="qsKeywordChange()"/>
+          </div>
+          <div class="form-group" style="max-width:260px">
+            <label>City</label>
+            <select id="qs-city"></select>
+          </div>
+          <div class="form-group" style="max-width:130px;justify-content:flex-end">
+            <button class="btn btn-primary" id="qs-btn" onclick="quickSearch()"><i class="fas fa-search"></i> Search</button>
+          </div>
         </div>
+
+        <!-- Preset keywords for one-click search -->
+        <div style="margin-top:8px">
+          <span style="font-size:11px;color:var(--muted);margin-right:8px">Quick presets:</span>
+          <div class="chip-grid" id="qs-presets" style="max-height:80px;display:inline-flex;background:transparent;border:none;padding:0;gap:6px"></div>
+        </div>
+
+        <div id="qs-status" class="mt-2"></div>
+      </div>
+
+      <!-- Inline Results -->
+      <div id="qs-results-card" class="card" style="display:none">
+        <div class="action-bar">
+          <span class="count" id="qs-count">0 selected</span>
+          <button class="btn btn-outline btn-sm" onclick="qsSelectAll(true)"><i class="fas fa-check-double"></i> Select All</button>
+          <button class="btn btn-outline btn-sm" onclick="qsSelectAll(false)"><i class="fas fa-times"></i> Clear</button>
+          <button class="btn btn-outline btn-sm" onclick="qsSelectWithEmail()"><i class="fas fa-envelope"></i> Select w/ Email</button>
+          <button class="btn btn-purple btn-sm" onclick="qsAddToGroup()"><i class="fas fa-folder-plus"></i> Add to Group</button>
+          <button class="btn btn-success btn-sm" onclick="qsSaveOnly()"><i class="fas fa-save"></i> Save Only</button>
+          <button class="btn btn-primary btn-sm" onclick="qsCreateCampaign()"><i class="fas fa-rocket"></i> Add to New Campaign</button>
+        </div>
+        <div id="qs-results"></div>
+      </div>
+
+      <!-- Bulk Multi-City Search (existing) -->
+      <div class="card">
+        <div class="card-title"><i class="fas fa-layer-group"></i> Bulk Multi-City Search <span class="right">Run many searches at once</span></div>
+        <details>
+          <summary style="cursor:pointer;color:var(--muted);font-size:13px">Click to expand bulk search (saves directly to database)</summary>
+          <div style="margin-top:14px">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Pick categories:</div>
+            <div class="chip-grid" id="categories-grid" style="max-height:120px"></div>
+            <div style="font-size:12px;color:var(--muted);margin:14px 0 8px">Pick cities:</div>
+            <div class="chip-grid" id="cities-grid" style="max-height:120px"></div>
+            <div class="chip-row-actions">
+              <button class="btn btn-xs btn-outline" onclick="selectAllCities(true)"><i class="fas fa-check-double"></i> All UAE</button>
+              <button class="btn btn-xs btn-outline" onclick="selectAllCities('gcc')"><i class="fas fa-globe"></i> All GCC</button>
+              <button class="btn btn-xs btn-outline" onclick="selectAllCities(false)"><i class="fas fa-times"></i> Clear</button>
+            </div>
+            <div class="alert alert-warn mt-3" id="search-summary" style="display:none">
+              <i class="fas fa-info-circle"></i>
+              <div><span id="sum-cats">0</span> categories × <span id="sum-cities">0</span> cities = <strong><span id="sum-total">0</span> searches</strong></div>
+            </div>
+            <button class="btn btn-primary mt-2" id="search-btn" onclick="launchSearch()"><i class="fas fa-rocket"></i> Launch Bulk Search</button>
+            <div id="search-status" class="mt-2"></div>
+            <div id="search-results" class="mt-2"></div>
+          </div>
+        </details>
       </div>
 
       <div class="card">
-        <div class="card-title"><i class="fas fa-map-marker-alt"></i> Step 2 — Pick Target Cities <span class="right">UAE & GCC region</span></div>
-        <div class="chip-grid" id="cities-grid"></div>
-        <div class="chip-row-actions">
-          <button class="btn btn-xs btn-outline" onclick="selectAllCities(true)"><i class="fas fa-check-double"></i> Select All UAE</button>
-          <button class="btn btn-xs btn-outline" onclick="selectAllCities('gcc')"><i class="fas fa-globe"></i> All GCC</button>
-          <button class="btn btn-xs btn-outline" onclick="selectAllCities(false)"><i class="fas fa-times"></i> Clear</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title"><i class="fas fa-rocket"></i> Step 3 — Launch Search</div>
-        <div class="alert alert-warn" id="search-summary" style="display:none">
-          <i class="fas fa-info-circle"></i>
-          <div>Selected: <span id="sum-cats">0</span> categories × <span id="sum-cities">0</span> cities = <strong><span id="sum-total">0</span> searches</strong> (~10 leads each, ~<span id="sum-leads">0</span> potential leads)</div>
-        </div>
-        <button class="btn btn-primary" id="search-btn" onclick="launchSearch()"><i class="fas fa-search"></i> Launch Multi-Search</button>
-        <div id="search-status" class="mt-2"></div>
-        <div id="search-results" class="mt-2"></div>
-      </div>
-
-      <div class="card">
-        <div class="card-title"><i class="fas fa-file-import"></i> Or Import Your Own CSV</div>
+        <div class="card-title"><i class="fas fa-file-import"></i> Import CSV</div>
         <div class="alert alert-info"><i class="fas fa-info-circle"></i><div>CSV columns: <code>name, email, phone, website, city, country</code></div></div>
         <div class="flex gap-2">
           <input type="file" id="csv-file" accept=".csv" style="flex:1"/>
@@ -508,6 +584,19 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
       </div>
     </div>
 
+    <!-- ────────────────── CONTACT GROUPS ────────────────── -->
+    <div class="tab-panel" id="tab-groups">
+      <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <div><strong>Contact Groups</strong> — Organize leads into named groups (e.g. "Hot Prospects", "Q1 2026", "Tier 1 Targets"). A lead can belong to multiple groups. Useful for targeting specific campaigns.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><i class="fas fa-folder-tree"></i> Your Groups <button class="btn btn-primary btn-sm ml-auto" onclick="newGroup()"><i class="fas fa-plus"></i> New Group</button></div>
+        <div id="groups-list"></div>
+      </div>
+    </div>
+
     <!-- ────────────────── SETTINGS ────────────────── -->
     <div class="tab-panel" id="tab-settings">
       <div class="card">
@@ -585,6 +674,7 @@ function tab(name, el) {
     sent:['Sent Emails','Every email ever sent, with full previews'],
     replies:['Replies','Leads who responded — auto-detected'],
     campaigns:['Campaigns','Pending approvals & campaign history'],
+    groups:['Contact Groups','Organize leads into named groups'],
     settings:['Settings','Configuration & integrations']
   };
   document.getElementById('page-title').textContent = titles[name][0];
@@ -883,9 +973,11 @@ async function loadLeads(page) {
       <td><div style="font-size:12px">${l.city||'—'}</div>${l.country?`<div style="font-size:11px;color:var(--muted)">${l.country}</div>`:''}</td>
       <td><span style="font-size:11px;color:var(--muted)">${(l.category||'').split(',')[0]||'-'}</span></td>
       <td>
-        ${l.in_sequence?`<span class="badge badge-seq">Step ${l.sequence_step||0}/5</span>`:
-          (l.sequence_step>=5?'<span class="badge badge-done">Completed</span>':'<span class="badge badge-new">Not enrolled</span>')}
-        ${l.replied?'<br/><span class="badge badge-replied mt-2">✓ Replied</span>':''}
+        ${l.source?`<span class="src-badge src-${l.source}">${l.source}</span><br/>`:''}
+        ${l.status?`<span class="status-pill st-${l.status}">${l.status}</span><br/>`:''}
+        ${l.in_sequence?`<span class="badge badge-seq" style="margin-top:3px">Step ${l.sequence_step||0}/5</span>`:
+          (l.sequence_step>=5?'<span class="badge badge-done" style="margin-top:3px">Completed</span>':'')}
+        ${(l.groups||[]).map(g=>`<span class="lead-group" style="background:${g.color||'#3b82f6'};margin-top:3px">${escapeHtml(g.name)}</span>`).join('')}
       </td>
       <td>
         ${l.maps_url?`<a href="${l.maps_url}" target="_blank" class="btn btn-outline btn-xs"><i class="fas fa-map-marker-alt"></i></a>`:''}
@@ -1017,8 +1109,8 @@ init();
     <div class="approval-banner">
       <i class="fas fa-shield-halved"></i>
       <div>
-        <h3>Mandatory Campaign Approval</h3>
-        <p>Review every detail before approving. No emails will be sent until you click "Approve & Send".</p>
+        <h3>Approve Campaign — First Email Approval</h3>
+        <p>Approving this sends Email 1 immediately. Emails 2-5 will follow automatically over 21 days. You can Pause/Stop anytime.</p>
       </div>
     </div>
     <div class="approval-body" id="approval-body"></div>
