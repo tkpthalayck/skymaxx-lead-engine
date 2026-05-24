@@ -1,0 +1,17 @@
+name: CampDiag
+on: { push: { paths: ['camp_diag.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 camp_diag.py
+      - if: always()
+        run: |
+          git config user.email "bot@skymaxx.company"
+          git config user.name "Bot"
+          git add -f camp_diag.txt || true
+          git diff --staged --quiet || git commit -m "v [skip ci]"
+          git push || true
