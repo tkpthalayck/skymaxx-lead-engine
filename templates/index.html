@@ -160,6 +160,59 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);cursor:po
 .flex{display:flex}.gap-2{gap:8px}.gap-3{gap:12px}.ml-auto{margin-left:auto}.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mb-2{margin-bottom:8px}
 code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px;font-family:'SF Mono',monospace;color:var(--accent2)}
 
+
+/* APPROVAL MODAL */
+.approval-modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:920px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+.approval-banner{background:linear-gradient(135deg,#7c3aed 0%,#3b82f6 100%);padding:18px 24px;color:#fff;display:flex;align-items:center;gap:14px}
+.approval-banner i{font-size:24px}
+.approval-banner h3{font-size:18px;font-weight:700;margin:0}
+.approval-banner p{font-size:13px;opacity:.85;margin:2px 0 0}
+.approval-body{flex:1;overflow-y:auto;padding:20px 24px;display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+.approval-section{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px}
+.approval-section h4{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.approval-section h4 i{color:var(--accent)}
+.approval-section .big-number{font-size:30px;font-weight:700;color:#fff;line-height:1}
+.approval-section .label-sub{font-size:11px;color:var(--muted);margin-top:3px}
+.approval-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-top:1px solid var(--border)}
+.approval-row:first-child{border-top:none}
+.approval-row .k{color:var(--muted)}
+.approval-row .v{color:#fff;font-weight:500}
+.risk-meter{height:10px;background:var(--surface3);border-radius:5px;overflow:hidden;margin:8px 0}
+.risk-meter-fill{height:100%;border-radius:5px;transition:width .3s}
+.risk-low{background:var(--green)} .risk-med{background:var(--gold)} .risk-high{background:var(--red)}
+.health-indicator{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-size:12px;margin-bottom:6px}
+.health-ok{background:rgba(16,185,129,.1);color:#6ee7b7}
+.health-warn{background:rgba(245,158,11,.1);color:#fcd34d}
+.health-bad{background:rgba(239,68,68,.1);color:#fca5a5}
+.sample-leads{font-size:12px;color:var(--muted2);max-height:120px;overflow-y:auto}
+.sample-leads .lead{padding:5px 0;border-top:1px solid var(--border)}
+.sample-leads .lead:first-child{border-top:none}
+.approval-actions{padding:16px 24px;border-top:1px solid var(--border);background:var(--surface2);display:flex;gap:10px;flex-wrap:wrap}
+.approval-actions .btn{flex:1;justify-content:center;padding:13px}
+.btn-approve{background:var(--green)!important;color:#fff!important;font-weight:700}
+.btn-approve:hover{background:#059669!important}
+.btn-review{background:var(--gold)!important;color:#000!important;font-weight:700}
+.btn-modify{background:var(--accent)!important;color:#fff!important;font-weight:700}
+.btn-reject{background:var(--red)!important;color:#fff!important;font-weight:700}
+.mini-step{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px}
+.mini-step-num{width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex-shrink:0}
+
+/* AI ASSISTANT */
+.ai-btn{background:linear-gradient(135deg,#a855f7 0%,#3b82f6 100%);color:#fff;padding:6px 14px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.ai-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(168,85,247,.3)}
+.ai-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:780px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.ai-panel-header{background:linear-gradient(135deg,#a855f7 0%,#3b82f6 100%);padding:16px 22px;color:#fff;display:flex;align-items:center;gap:12px}
+.ai-panel-body{flex:1;overflow-y:auto;padding:20px 22px}
+.ai-actions-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:18px}
+.ai-action{background:var(--surface2);border:1px solid var(--border);padding:10px 12px;border-radius:7px;cursor:pointer;font-size:12px;transition:.15s;text-align:left;color:var(--text)}
+.ai-action:hover{border-color:var(--purple);background:rgba(168,85,247,.06)}
+.ai-action i{color:var(--purple);margin-right:6px}
+.ai-result{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:14px 16px;font-size:13px;line-height:1.6;max-height:400px;overflow-y:auto;white-space:pre-wrap}
+
+/* APPROVAL BANNER ON SEQUENCE TAB */
+.approval-warning{background:linear-gradient(135deg,rgba(168,85,247,.15) 0%,rgba(59,130,246,.15) 100%);border:1px solid rgba(168,85,247,.3);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;gap:14px;align-items:center}
+.approval-warning i{font-size:22px;color:#a855f7}
+
 /* RESPONSIVE */
 @media(max-width:900px){.sidebar{display:none}.main{margin-left:0}}
 </style>
@@ -188,6 +241,7 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
     <div class="nav-item" onclick="tab('sequence', this)"><i class="fas fa-stream"></i> Email Sequence</div>
     <div class="nav-item" onclick="tab('sent', this)"><i class="fas fa-paper-plane"></i> Sent Emails</div>
     <div class="nav-item" onclick="tab('replies', this)"><i class="fas fa-inbox"></i> Replies <span id="nav-replies-count" class="nav-badge" style="display:none">0</span></div>
+    <div class="nav-item" onclick="tab('campaigns', this)"><i class="fas fa-rocket"></i> Campaigns</div>
   </div>
 
   <div class="nav-section">
@@ -320,8 +374,8 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
             <button class="btn btn-outline btn-sm" onclick="window.location='/api/export'"><i class="fas fa-download"></i> Export CSV</button>
             <button class="btn btn-outline btn-sm" onclick="cleanNoEmail()"><i class="fas fa-broom"></i> Clean (no email)</button>
             <button class="btn btn-danger btn-sm" onclick="bulkDelete()" id="bulk-del-btn" disabled><i class="fas fa-trash"></i> Delete Selected</button>
-            <button class="btn btn-gold btn-sm" onclick="enrollSelected()" id="bulk-enroll-btn" disabled><i class="fas fa-play"></i> Enroll Selected</button>
-            <button class="btn btn-success btn-sm" onclick="enrollAll()"><i class="fas fa-play-circle"></i> Enroll All Eligible</button>
+            <button class="btn btn-purple btn-sm" onclick="createCampaign('selected')" id="bulk-enroll-btn" disabled><i class="fas fa-rocket"></i> Campaign Selected</button>
+            <button class="btn btn-success btn-sm" onclick="createCampaign('all')"><i class="fas fa-rocket"></i> Campaign All Eligible</button>
           </div>
         </div>
         <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px">
@@ -439,6 +493,21 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
       </div>
     </div>
 
+    <!-- ────────────────── CAMPAIGNS ────────────────── -->
+    <div class="tab-panel" id="tab-campaigns">
+      <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <div><strong>Mandatory Approval Workflow</strong> — Every campaign must be explicitly approved before any emails are sent. This protects against accidental mass-sends and ensures deliverability.</div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-rocket"></i> All Campaigns <button class="btn btn-outline btn-sm ml-auto" onclick="loadCampaigns()"><i class="fas fa-sync"></i> Refresh</button></div>
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>Name</th><th>Status</th><th>Recipients</th><th>Risk</th><th>Est. Replies</th><th>Created</th><th>Action</th></tr></thead>
+          <tbody id="campaigns-tb"><tr><td colspan="7"><div class="empty"><i class="fas fa-rocket"></i><p>No campaigns yet — create one from "All Leads" tab</p></div></td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
     <!-- ────────────────── SETTINGS ────────────────── -->
     <div class="tab-panel" id="tab-settings">
       <div class="card">
@@ -515,6 +584,7 @@ function tab(name, el) {
     sequence:['Email Sequence','Preview & test your 5-email drip'],
     sent:['Sent Emails','Every email ever sent, with full previews'],
     replies:['Replies','Leads who responded — auto-detected'],
+    campaigns:['Campaigns','Pending approvals & campaign history'],
     settings:['Settings','Configuration & integrations']
   };
   document.getElementById('page-title').textContent = titles[name][0];
@@ -602,6 +672,7 @@ function renderSequenceCards() {
       </div>
       <div class="email-card-actions">
         <button class="btn btn-outline btn-xs" onclick="previewTemplate(${t.step})"><i class="fas fa-eye"></i> Preview HTML</button>
+        <button class="ai-btn" onclick="openAIPanel(${t.step})"><i class="fas fa-wand-magic-sparkles"></i> AI Assistant</button>
       </div>
     </div>`).join('');
 }
@@ -939,5 +1010,52 @@ function escapeHtml(s) {
 
 init();
 </script>
+
+<!-- ─── Approval Modal ─── -->
+<div class="modal-overlay" id="approval-modal" onclick="if(event.target===this)closeApprovalModal()">
+  <div class="approval-modal">
+    <div class="approval-banner">
+      <i class="fas fa-shield-halved"></i>
+      <div>
+        <h3>Mandatory Campaign Approval</h3>
+        <p>Review every detail before approving. No emails will be sent until you click "Approve & Send".</p>
+      </div>
+    </div>
+    <div class="approval-body" id="approval-body"></div>
+    <div class="approval-actions">
+      <button class="btn btn-reject" onclick="campaignAction('reject')"><i class="fas fa-times"></i> Reject Campaign</button>
+      <button class="btn btn-modify" onclick="campaignAction('modify')"><i class="fas fa-edit"></i> Modify Campaign</button>
+      <button class="btn btn-review" onclick="closeApprovalModal()"><i class="fas fa-arrows-rotate"></i> Review Again</button>
+      <button class="btn btn-approve" onclick="campaignAction('approve')"><i class="fas fa-paper-plane"></i> Approve &amp; Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── AI Assistant Panel ─── -->
+<div class="modal-overlay" id="ai-modal" onclick="if(event.target===this)closeAIPanel()">
+  <div class="ai-panel">
+    <div class="ai-panel-header">
+      <i class="fas fa-wand-magic-sparkles" style="font-size:22px"></i>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:700">AI Assistant</div>
+        <div style="font-size:12px;opacity:.85" id="ai-context">Editing email step</div>
+      </div>
+      <button class="modal-close" onclick="closeAIPanel()" style="color:#fff">&times;</button>
+    </div>
+    <div class="ai-panel-body">
+      <div id="ai-not-configured" class="alert alert-warn" style="display:none">
+        <i class="fas fa-key"></i>
+        <div><strong>AI not configured.</strong> Add <code>AI_PROVIDER</code> (anthropic|openai) and <code>AI_API_KEY</code> environment variables in Render dashboard to enable AI features.</div>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Pick an action to improve this email. AI will preserve all variables like <code>{{first_name}}</code>.</p>
+      <div class="ai-actions-grid" id="ai-actions-grid"></div>
+      <div id="ai-result-wrapper" style="display:none">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">AI Result</div>
+        <div class="ai-result" id="ai-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
