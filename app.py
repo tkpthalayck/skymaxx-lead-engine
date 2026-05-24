@@ -462,6 +462,134 @@ def email_log_route():
     conn.close()
     return jsonify({"log": logs})
 
+
+# ─────────────────────────────────────────────
+# MICROSOFT GRAPH API — REPLY DETECTION
+# ─────────────────────────────────────────────
+import urllib.parse as _urlparse
+
+AZURE_TENANT_ID     = os.getenv("AZURE_TENANT_ID", "")
+AZURE_CLIENT_ID     = os.getenv("AZURE_CLIENT_ID", "")
+AZURE_CLIENT_SECRET = os.getenv("AZURE_CLIENT_SECRET", "")
+MAILBOX_EMAIL       = os.getenv("MAILBOX_EMAIL", "support@skymaxx.company")
+REPLY_POLL_MINUTES  = int(os.getenv("REPLY_POLL_MINUTES", "5"))
+
+_graph_token_cache = {"token": None, "expires_at": 0}
+
+def get_graph_token():
+    """Get cached or fresh OAuth token for Microsoft Graph."""
+    now = time.time()
+    if _graph_token_cache["token"] and now < _graph_token_cache["expires_at"] - 60:
+        return _graph_token_cache["token"]
+    if not (AZURE_TENANT_ID and AZURE_CLIENT_ID and AZURE_CLIENT_SECRET):
+        return None
+    url = f"https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/token"
+    body = _urlparse.urlencode({
+        "client_id":     AZURE_CLIENT_ID,
+        "client_secret": AZURE_CLIENT_SECRET,
+        "scope":         "https://graph.microsoft.com/.default",
+        "grant_type":    "client_credentials",
+    }).encode()
+    try:
+        r = requests.post(url, data=body, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=20)
+        if r.status_code == 200:
+            d = r.json()
+            _graph_token_cache["token"]      = d["access_token"]
+            _graph_token_cache["expires_at"] = now + d.get("expires_in", 3600)
+            return d["access_token"]
+        print(f"[graph] Token fetch failed: {r.status_code} {r.text[:200]}")
+    except Exception as e:
+        print(f"[graph] Token error: {e}")
+    return None
+
+def fetch_recent_replies(minutes_ago=10):
+    """Fetch emails received in the last N minutes from MAILBOX_EMAIL."""
+    token = get_graph_token()
+    if not token: return []
+    since_iso = (datetime.utcnow() - timedelta(minutes=minutes_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    url = (f"https://graph.microsoft.com/v1.0/users/{MAILBOX_EMAIL}/messages"
+           f"?$filter=receivedDateTime ge {since_iso}"
+           f"&$select=from,subject,receivedDateTime,internetMessageId"
+           f"&$top=50&$orderby=receivedDateTime desc")
+    try:
+        r = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=20)
+        if r.status_code == 200:
+            return r.json().get("value", [])
+        print(f"[graph] Messages fetch failed: {r.status_code} {r.text[:200]}")
+    except Exception as e:
+        print(f"[graph] Messages error: {e}")
+    return []
+
+def process_replies():
+    """Check inbox for replies from leads and auto-pause their sequences."""
+    if not (AZURE_TENANT_ID and AZURE_CLIENT_ID and AZURE_CLIENT_SECRET):
+        return  # Not configured
+    messages = fetch_recent_replies(REPLY_POLL_MINUTES * 2)  # slight overlap to avoid misses
+    if not messages: return
+
+    conn = get_db()
+    matched = 0
+    for msg in messages:
+        sender = (msg.get("from", {}).get("emailAddress", {}).get("address", "") or "").lower().strip()
+        if not sender: continue
+
+        # Match sender against any lead with status not already 'replied'
+        row = conn.execute("SELECT id, name FROM leads WHERE LOWER(email)=? AND replied=0", [sender]).fetchone()
+        if not row: continue
+
+        lead_id, name = row["id"], row["name"]
+        subject = msg.get("subject", "")[:200]
+
+        # Mark as replied, pause sequence, change status
+        conn.execute("UPDATE leads SET replied=1, in_sequence=0, status='qualified' WHERE id=?", [lead_id])
+        conn.execute("""INSERT INTO email_log (lead_id, step, to_email, subject, status, error_msg)
+                        VALUES (?, 0, ?, ?, 'reply_detected', ?)""",
+                     [lead_id, sender, "REPLY: " + subject, msg.get("receivedDateTime", "")])
+
+        # Send auto-acknowledgment
+        ack_subject = AUTO_REPLY_TEMPLATE["subject"]
+        ack_body    = AUTO_REPLY_TEMPLATE["body"].replace("{{name}}", (name.split()[0] if name else "there"))
+        send_via_zepto(sender, name, ack_subject, ack_body)
+
+        matched += 1
+        print(f"[reply-detected] {sender} ({name}) — sequence paused, auto-ack sent")
+
+    if matched:
+        conn.commit()
+    conn.close()
+    return matched
+
+def reply_poller_loop():
+    """Background thread: polls inbox every REPLY_POLL_MINUTES."""
+    while True:
+        try:
+            n = process_replies()
+            if n: print(f"[reply-poller] Detected {n} reply(ies)")
+        except Exception as e:
+            print(f"[reply-poller] Error: {e}")
+        time.sleep(REPLY_POLL_MINUTES * 60)
+
+# Start reply detection thread if configured
+if AZURE_TENANT_ID and AZURE_CLIENT_ID and AZURE_CLIENT_SECRET:
+    threading.Thread(target=reply_poller_loop, daemon=True).start()
+    print(f"[reply-poller] Started — polling {MAILBOX_EMAIL} every {REPLY_POLL_MINUTES} min")
+
+# ── Manual trigger endpoint ──
+@app.route("/api/replies/poll", methods=["POST"])
+def manual_poll_replies():
+    n = process_replies()
+    return jsonify({"detected": n or 0})
+
+# ── Replies status endpoint ──
+@app.route("/api/replies/status")
+def replies_status():
+    return jsonify({
+        "configured":   bool(AZURE_TENANT_ID and AZURE_CLIENT_ID and AZURE_CLIENT_SECRET),
+        "mailbox":      MAILBOX_EMAIL,
+        "poll_minutes": REPLY_POLL_MINUTES,
+    })
+
+
 # ── AUTO-REPLY WEBHOOK (called by inbound email service) ──
 @app.route("/api/auto_reply", methods=["POST"])
 def auto_reply():
@@ -569,6 +697,8 @@ def config_check():
         "from_name":    FROM_NAME,
         "reply_to":     REPLY_TO,
         "daily_limit":  DAILY_SEND_LIMIT,
+        "graph_api":    bool(AZURE_TENANT_ID and AZURE_CLIENT_ID and AZURE_CLIENT_SECRET),
+        "mailbox":      MAILBOX_EMAIL,
     })
 
 if __name__ == "__main__":
