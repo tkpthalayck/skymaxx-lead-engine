@@ -1860,10 +1860,12 @@ def search_v2_preview():
             det = {}
         time.sleep(0.3)
         website = det.get("website", "") or ""
+        # Pre-set has_email/email_source if no website (final state)
+        # If website exists, frontend will enrich via /api/search/v2/enrich_emails
         results.append({
             "place_id":   pid,
             "name":       det.get("name") or place.get("name", ""),
-            "email":      "",        # will be filled by enrich_leads_parallel below
+            "email":      "",
             "phone":      det.get("formatted_phone_number", ""),
             "website":    website,
             "address":    det.get("formatted_address", ""),
@@ -1874,11 +1876,8 @@ def search_v2_preview():
             "reviews":    place.get("user_ratings_total", 0),
             "maps_url":   f"https://www.google.com/maps/place/?q=place_id:{pid}",
             "has_email":  False,
-            "email_source": "none",
+            "email_source": "pending" if website else "none",
         })
-
-    # ─── Scrape real emails from websites in parallel ───
-    results = enrich_leads_parallel(results, max_workers=10)
 
     # Mark already-saved
     if results:
@@ -1905,6 +1904,38 @@ def search_v2_preview():
 # ─────────────────────────────────────────────
 # BULK MULTI-DIMENSIONAL SEARCH (preview, no save)
 # ─────────────────────────────────────────────
+
+@app.route("/api/search/v2/enrich_emails", methods=["POST"])
+def search_v2_enrich_emails():
+    """Scrape emails for a batch of leads. Called after preview returns.
+
+    Input: {"leads": [{"place_id": "...", "website": "..."}, ...]}  (max 8 per call)
+    Output: {"emails": {"place_id_1": {"email": "info@x.com", "email_source": "scraped"|"generated"|"none"}, ...}}
+    """
+    data = request.json or {}
+    leads = data.get("leads", [])
+    if not leads:
+        return jsonify({"emails": {}})
+    # Cap at 8 to stay under Render's proxy timeout
+    leads = leads[:8]
+
+    # Build minimal dicts for parallel scraping
+    work = [{"place_id": l.get("place_id",""), "website": l.get("website","")} for l in leads]
+    # Parallel scrape — should take ~5-15s for 8 leads
+    enriched = enrich_leads_parallel(work, max_workers=8)
+
+    out = {}
+    for e in enriched:
+        pid = e.get("place_id")
+        if pid:
+            out[pid] = {
+                "email": e.get("email", ""),
+                "email_source": e.get("email_source", "none"),
+                "has_email": e.get("has_email", False),
+            }
+    return jsonify({"emails": out})
+
+
 @app.route("/api/search/v2/bulk_preview", methods=["POST"])
 def search_v2_bulk_preview():
     """Bulk search: multiple countries × states × categories × job titles in one batch."""
