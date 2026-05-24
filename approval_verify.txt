@@ -1,0 +1,16 @@
+OK / -> HTTP 200 | <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initia
+OK /api/config -> HTTP 200 | {"bcc_support":true,"daily_limit":300,"from_email":"noreply@skymaxx.company","from_name":"SKYMAXX Support Team","google_
+OK /api/campaigns -> HTTP 200 | {"campaigns":[]}
+
+OK /api/domain/health -> HTTP 200 | {"dkim":{"selectors":[{"found":true,"name":"selector1"}],"status":"ok"},"dmarc":{"policy":"none","status":"ok","value":"
+OK /api/ai/status -> HTTP 200 | {"available_actions":["rewrite","improve_conversion","personalize","make_professional","make_friendly","make_technical",
+
+=== Domain Health for skymaxx.company ===
+SPF:   ok | v=spf1 include:spf.protection.outlook.com include:zeptomail.zoho.com -all
+DKIM:  ok | selectors: ['selector1']
+DMARC: ok
+Score: 100/100
