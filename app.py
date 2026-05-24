@@ -20,7 +20,7 @@ CORS(app)
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 ZEPTO_TOKEN         = os.getenv("ZEPTO_TOKEN", "")
 FROM_EMAIL          = os.getenv("FROM_EMAIL", "noreply@skymaxx.company")
-FROM_NAME           = os.getenv("FROM_NAME", "Ali | SKYMAXX IT Solutions")
+FROM_NAME           = os.getenv("FROM_NAME", "SKYMAXX Support Team")
 REPLY_TO            = os.getenv("REPLY_TO", "support@skymaxx.company")
 DAILY_SEND_LIMIT    = int(os.getenv("DAILY_SEND_LIMIT", "300"))
 DB_PATH             = os.getenv("DB_PATH", "skymaxx.db")
@@ -46,7 +46,7 @@ SEQUENCE_TEMPLATES = [
 <p>I came across <strong>{{company}}</strong> while researching businesses in {{city}}, and wanted to reach out briefly.</p>
 <p>We help SMBs in the UAE & GCC streamline their email and IT operations — typically saving 10-15 hours per week of admin work and reducing IT costs by 30-40%.</p>
 <p>Would you be open to a 15-minute call to see if it's relevant for {{company}}?</p>
-<p>Best,<br/><strong>Ali</strong><br/>SKYMAXX IT Solutions<br/>support@skymaxx.company</p>"""
+<p>Best regards,<br/><strong>SKYMAXX Support Team</strong><br/>support@skymaxx.company</p>"""
     },
     {
         "step": 2, "delay_days": 3, "name": "Value",
@@ -62,7 +62,7 @@ SEQUENCE_TEMPLATES = [
   <li>✅ Backup & disaster recovery</li>
 </ul>
 <p>Most clients see ROI within 60 days. Worth a quick chat?</p>
-<p>Best,<br/><strong>Ali</strong><br/>SKYMAXX IT Solutions</p>"""
+<p>Best regards,<br/><strong>SKYMAXX Support Team</strong><br/>support@skymaxx.company</p>"""
     },
     {
         "step": 3, "delay_days": 7, "name": "Social Proof",
@@ -82,7 +82,7 @@ SEQUENCE_TEMPLATES = [
   <li>✅ Tickets resolved within 4 hours guaranteed</li>
 </ul>
 <p>Open to a quick 15-min call to discuss your situation?</p>
-<p>Best,<br/><strong>Ali</strong></p>"""
+<p>Best regards,<br/><strong>SKYMAXX Support Team</strong></p>"""
     },
     {
         "step": 4, "delay_days": 14, "name": "Follow-up",
@@ -92,7 +92,7 @@ SEQUENCE_TEMPLATES = [
 <p>If managing IT and email is a priority for <strong>{{company}}</strong> this quarter, I'd love to share how we could help.</p>
 <p>Even a quick 10-minute call would give us both clarity on whether there's a fit.</p>
 <p>👉 <a href="mailto:support@skymaxx.company?subject=Yes,%20interested%20-%20{{company}}">Reply "Yes" to book a call</a></p>
-<p>Best,<br/><strong>Ali</strong><br/>SKYMAXX IT Solutions</p>"""
+<p>Best regards,<br/><strong>SKYMAXX Support Team</strong><br/>support@skymaxx.company</p>"""
     },
     {
         "step": 5, "delay_days": 21, "name": "Breakup",
@@ -102,7 +102,7 @@ SEQUENCE_TEMPLATES = [
 <p>If <strong>{{company}}</strong>'s IT and email setup is working well, that's great. If it ever becomes a pain point, our door is open.</p>
 <p>👉 You can always reach me at <a href="mailto:support@skymaxx.company">support@skymaxx.company</a> when the timing is right.</p>
 <p>Wishing you and the {{company}} team continued success.</p>
-<p>Best,<br/><strong>Ali</strong><br/>SKYMAXX IT Solutions<br/>UAE | GCC Region</p>"""
+<p>Best regards,<br/><strong>SKYMAXX Support Team</strong><br/>SKYMAXX IT Solutions<br/>UAE | GCC Region</p>"""
     }
 ]
 
