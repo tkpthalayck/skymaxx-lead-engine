@@ -1860,26 +1860,25 @@ def search_v2_preview():
             det = {}
         time.sleep(0.3)
         website = det.get("website", "") or ""
-        email = ""
-        if website:
-            domain = website.replace("https://","").replace("http://","").split("/")[0]
-            if domain.startswith("www."): domain = domain[4:]
-            email = f"info@{domain}"
         results.append({
             "place_id":   pid,
             "name":       det.get("name") or place.get("name", ""),
-            "email":      email,
+            "email":      "",        # will be filled by enrich_leads_parallel below
             "phone":      det.get("formatted_phone_number", ""),
             "website":    website,
             "address":    det.get("formatted_address", ""),
             "city":       city or state or country,
-            "country":    country or city.split(",")[-1].strip() if city else "",
+            "country":    country or (city.split(",")[-1].strip() if city else ""),
             "category":   category or ", ".join(place.get("types", [])[:3]),
             "rating":     place.get("rating", 0),
             "reviews":    place.get("user_ratings_total", 0),
             "maps_url":   f"https://www.google.com/maps/place/?q=place_id:{pid}",
-            "has_email":  bool(email),
+            "has_email":  False,
+            "email_source": "none",
         })
+
+    # ─── Scrape real emails from websites in parallel ───
+    results = enrich_leads_parallel(results, max_workers=10)
 
     # Mark already-saved
     if results:
@@ -2042,10 +2041,28 @@ def search_v2_save_selected():
         except Exception:
             pass
 
+    # First, fill websites from detail_map where missing
+    for r in leads:
+        det = detail_map.get(r.get("place_id"), {})
+        if not r.get("website") and det.get("website"):
+            r["website"] = det["website"]
+
+    # Scrape emails for any lead missing a real email
+    leads_needing_email = [l for l in leads if not l.get("email") and l.get("website")]
+    if leads_needing_email:
+        enriched = enrich_leads_parallel(leads_needing_email, max_workers=10)
+        # Merge back
+        by_pid = {l["place_id"]: l for l in enriched if l.get("place_id")}
+        for r in leads:
+            if r.get("place_id") in by_pid:
+                r["email"] = by_pid[r["place_id"]].get("email", "")
+                r["email_source"] = by_pid[r["place_id"]].get("email_source", "none")
+
     for r in leads:
         det = detail_map.get(r.get("place_id"), {})
         website = r.get("website", "") or det.get("website", "") or ""
         email = r.get("email", "") or ""
+        # Final fallback if nothing else worked
         if not email and website:
             domain = website.replace("https://","").replace("http://","").split("/")[0]
             if domain.startswith("www."): domain = domain[4:]
@@ -2068,6 +2085,125 @@ def search_v2_save_selected():
         except Exception: pass
     conn.commit(); conn.close()
     return jsonify({"saved": saved, "lead_ids": saved_ids})
+
+
+
+# ─────────────────────────────────────────────
+# EMAIL SCRAPING FROM BUSINESS WEBSITES
+# ─────────────────────────────────────────────
+import concurrent.futures
+import re as _re
+
+_EMAIL_RE = _re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')
+_EMAIL_PRIORITY = ['info@','contact@','hello@','sales@','enquiry@','enquiries@','inquiries@','admin@','support@','office@','team@','marketing@','reservations@','bookings@']
+_EMAIL_BLOCKLIST = ['example.com','yourdomain','test@','noreply','no-reply','donotreply','sentry.io','wixpress','squarespace-cdn','typeform','.png','.jpg','.jpeg','.gif','.svg','.webp','.ico','privacy@','postmaster@','abuse@','dmca@','copyright@','legal@','jobs@','careers@','recruit@']
+
+def _normalize_email(e):
+    e = e.lower().strip().rstrip('.')
+    # Strip any URL-encoded suffix
+    if '?' in e: e = e.split('?')[0]
+    if '&' in e: e = e.split('&')[0]
+    return e
+
+def _is_valid_email(e):
+    if not e or len(e) > 80 or len(e) < 6: return False
+    if '@' not in e or '.' not in e.split('@')[1]: return False
+    for bad in _EMAIL_BLOCKLIST:
+        if bad in e: return False
+    # Must have at least 2 chars before @
+    local = e.split('@')[0]
+    if len(local) < 2: return False
+    return True
+
+def _pick_best_email(emails, target_domain=None):
+    """Pick the best email from a list. Prefer same-domain + priority prefixes."""
+    if not emails: return None
+    # Dedupe + normalize
+    seen = []
+    for e in emails:
+        n = _normalize_email(e)
+        if _is_valid_email(n) and n not in seen:
+            seen.append(n)
+    if not seen: return None
+
+    # Score: same domain (+10), priority prefix (+5 to 0 by index), generic prefix (+1)
+    def score(e):
+        s = 0
+        domain = e.split('@')[1]
+        if target_domain and (domain == target_domain or domain.endswith('.' + target_domain)):
+            s += 100
+        for i, p in enumerate(_EMAIL_PRIORITY):
+            if e.startswith(p):
+                s += 50 - i
+                break
+        return s
+
+    seen.sort(key=score, reverse=True)
+    return seen[0]
+
+def scrape_emails_from_website(website, timeout=5):
+    """Visit homepage + contact pages, return list of valid emails found."""
+    if not website: return []
+    if not website.startswith(('http://','https://')):
+        website = 'https://' + website
+    base = website.rstrip('/')
+    urls = [base, base + '/contact', base + '/contact-us', base + '/about', base + '/about-us']
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+    all_emails = []
+    for url in urls:
+        try:
+            r = requests.get(url, timeout=timeout, headers=headers, allow_redirects=True, verify=False)
+            if r.status_code != 200: continue
+            text = r.text[:300_000]  # cap to 300KB
+            found = _EMAIL_RE.findall(text)
+            # Also check mailto: links specifically (most reliable)
+            mailtos = _re.findall(r'mailto:([^"\'\s>?]+)', text)
+            for e in mailtos + found:
+                ne = _normalize_email(e)
+                if _is_valid_email(ne) and ne not in all_emails:
+                    all_emails.append(ne)
+            # Stop if we already found a few good candidates on homepage
+            if len(all_emails) >= 5 and url == base: break
+        except Exception:
+            continue
+    return all_emails
+
+
+def enrich_lead_with_email(lead):
+    """Take a lead dict (with 'website'), scrape its site, fill 'email'."""
+    website = (lead.get('website') or '').strip()
+    if not website:
+        lead['has_email'] = False
+        lead['email_source'] = 'none'
+        return lead
+
+    # Derive target domain for same-domain matching
+    domain = website.replace('https://','').replace('http://','').split('/')[0]
+    if domain.startswith('www.'): domain = domain[4:]
+
+    emails = scrape_emails_from_website(website, timeout=5)
+    best = _pick_best_email(emails, target_domain=domain)
+    if best:
+        lead['email'] = best
+        lead['has_email'] = True
+        lead['email_source'] = 'scraped'
+    else:
+        # Fall back to generated info@domain
+        lead['email'] = 'info@' + domain
+        lead['has_email'] = True
+        lead['email_source'] = 'generated'
+    return lead
+
+
+def enrich_leads_parallel(leads, max_workers=10):
+    """Enrich emails for many leads in parallel. Preserves order."""
+    if not leads: return leads
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+        return list(ex.map(enrich_lead_with_email, leads))
 
 
 # ── CONFIG STATUS ──
