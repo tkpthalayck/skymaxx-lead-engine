@@ -1,0 +1,17 @@
+=== SEARCH UPGRADE VERIFICATION ===
+
+[FAIL] /api/locations/countries             | HTTP 0
+[PASS] /api/locations/states/AE             | HTTP 200
+         → 7 items
+         → sample: "Dubai"
+[FAIL] /api/locations/states/SA             | HTTP 0
+[PASS] /api/business_categories             | HTTP 200
+         → 30 items
+         → sample: {"id": "real_estate", "keyword": "real estate agency", "label": "Real Estate Agencies"}
+[PASS] /api/job_titles                      | HTTP 200
+         → 22 items
+         → sample: {"id": "founder", "keyword": "founder", "label": "Founder"}
+
+=== DEPLOYMENT STATUS ===
+Backend (app.py):  v3 + hierarchical search - LIVE
+Frontend (index):  redesigned Find Leads tab - LIVE
