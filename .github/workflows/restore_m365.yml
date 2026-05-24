@@ -1,0 +1,16 @@
+name: Restore M365
+on: { push: { paths: ['restore_m365.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 restore_m365.py 2>&1 | tee restore_m365.txt || true
+      - if: always()
+        run: |
+          git config user.email "bot@skymaxx.company"
+          git config user.name "Bot"
+          git add -f restore_m365.txt || true
+          git diff --staged --quiet || git commit -m "v [skip ci]"
+          git push || true
