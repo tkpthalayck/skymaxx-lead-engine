@@ -1,0 +1,17 @@
+name: Debug500
+on: { push: { paths: ['debug500.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 debug500.py 2>&1 | tee debug500.txt || true
+      - if: always()
+        run: |
+          git config user.email "bot@skymaxx.company"
+          git config user.name "Bot"
+          git add -f debug500.txt || true
+          git diff --staged --quiet || git commit -m "v [skip ci]"
+          git push || true
