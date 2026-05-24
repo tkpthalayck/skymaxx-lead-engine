@@ -1,0 +1,17 @@
+name: FinalE2E
+on: { push: { paths: ['final_e2e.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 final_e2e.py
+      - if: always()
+        run: |
+          git config user.email "bot@skymaxx.company"
+          git config user.name "Bot"
+          git add -f final_e2e.txt || true
+          git diff --staged --quiet || git commit -m "v [skip ci]"
+          git push || true
