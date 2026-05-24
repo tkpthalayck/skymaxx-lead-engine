@@ -208,12 +208,18 @@ AUTO_REPLY_TEMPLATE = {
 # DATABASE
 # ─────────────────────────────────────────────
 def get_db():
+    if USE_POSTGRES:
+        return _get_pg_conn()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
     conn = get_db()
+    if USE_POSTGRES:
+        # Postgres-compatible schema with SERIAL instead of AUTOINCREMENT
+        _init_pg_schema(conn)
+        return
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS leads (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
