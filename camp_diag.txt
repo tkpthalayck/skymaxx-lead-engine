@@ -1,0 +1,35 @@
+=== CAMPAIGN CREATION FLOW DIAGNOSTIC ===
+
+STEP 1: Search
+  HTTP 200 in 9.7s
+  Got 5 leads (showing first 5)
+  - Xedos Technologies LLC - IT Su | email=NONE | website=True
+  - Peniel Technology LLC | email=NONE | website=True
+  - VRS Technologies LLC | email=NONE | website=True
+  - Meridian IT Solutions | Websit | email=NONE | website=True
+  - Cloud Tech IT Solutions L.L.C | email=NONE | website=True
+
+STEP 2: Enrich emails (first 4)
+  HTTP 200 in 4.4s
+  Got 4 email results
+  - Xedos Technologies LLC - IT Su -> info@xedos.ae (generated)
+  - Peniel Technology LLC -> info@penieltech.com (scraped)
+  - VRS Technologies LLC -> info@vrstech.com (generated)
+  - Meridian IT Solutions | Websit -> info@meridianuae.com (scraped)
+
+STEP 3: Save selected leads (with full lead objects)
+  HTTP 200 in 0.1s
+  Response: {'lead_ids': [15, 16, 17], 'saved': 3}
+  Saved 3 leads, IDs: [15, 16, 17]
+
+STEP 4: Create campaign draft
+  HTTP 200 in 1.7s
+  ✓ CAMPAIGN CREATED: id=3, status=pending_approval
+  Recipient count: 3
+  Risk score: 0
+
+STEP 5: List campaigns
+  Total campaigns: 3
+  - id=3 name=Test Campaign 1779651629 status=pending_approval recipients=3
+  - id=2 name=Outreach 5/24/2026 status=pending_approval recipients=13
+  - id=1 name=Outreach 5/24/2026 status=pending_approval recipients=1
