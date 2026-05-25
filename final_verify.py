@@ -1,44 +1,70 @@
-import os, json, urllib.request, time
 
-# 1. Check what env vars Render actually has
-KEY = os.environ['RENDER_API_KEY']
-SID = 'srv-d88vm9favr4c7396kt00'
+import urllib.request, json, time
 
-print('=== Render env vars ===')
-req = urllib.request.Request('https://api.render.com/v1/services/' + SID + '/env-vars',
-    headers={'Authorization': 'Bearer ' + KEY})
-resp = urllib.request.urlopen(req, timeout=30)
-envs = json.loads(resp.read())
-for e in envs:
-    ev = e.get('envVar', {})
-    k = ev.get('key', '')
-    v = ev.get('value', '')
-    if k in ('FROM_NAME', 'FROM_EMAIL', 'MAILBOX_EMAIL', 'AZURE_TENANT_ID'):
-        if 'SECRET' in k or 'TOKEN' in k or 'KEY' in k:
-            v = v[:10] + '...'
-        print('  ' + k + ' = ' + v)
+BASE = "https://skymaxx-lead-engine.onrender.com"
+log = []
+def L(m): log.append(m); print(m, flush=True)
 
-# 2. Check deploys status
-print('')
-print('=== Recent deploys ===')
-req = urllib.request.Request('https://api.render.com/v1/services/' + SID + '/deploys?limit=3',
-    headers={'Authorization': 'Bearer ' + KEY})
-resp = urllib.request.urlopen(req, timeout=30)
-deploys = json.loads(resp.read())
-for d in deploys:
-    dep = d.get('deploy', {})
-    print('  ' + dep.get('status','?') + ' | ' + dep.get('finishedAt','?')[:19] + ' | ' + (dep.get('commit',{}).get('message','?')[:50]))
+L("=== AFTER PYTHON 3.12 PIN — DEBUG STATE ===")
+L("")
+try:
+    r = urllib.request.urlopen(BASE + "/api/debug/db", timeout=45)
+    info = json.loads(r.read().decode())
+    for k, v in info.items():
+        L("  " + str(k) + ": " + str(v)[:200])
+except Exception as e:
+    L("Error: " + str(e))
 
-# 3. Wait then check live
-print('')
-print('Waiting 60s for any deploy to complete...')
-time.sleep(60)
-req = urllib.request.Request('https://skymaxx-lead-engine.onrender.com/api/config')
-resp = urllib.request.urlopen(req, timeout=60)
-cfg = json.loads(resp.read())
-print('=== LIVE CONFIG ===')
-print('  from_name :', cfg.get('from_name'))
-print('  from_email:', cfg.get('from_email'))
+# If USE_POSTGRES is True now, re-import leads and we are done
+L("")
+L("=== RE-IMPORT LEADS (FINAL) ===")
+leads = [
+    ("Aaron Barak", "abarak@maximaapparel.com", "COO", "Maxima Apparel"),
+    ("Chris Kucharski", "chris.kucharski@onerail.io", "CTO", "OneRail"),
+    ("Hank Jackson", "hank.jackson@edgewaterit.com", "COO", "Edgewater"),
+    ("James Stanford", "james.stanford@edgewaterit.com", "Sr Director", "Edgewater"),
+    ("Raymond Churgovich", "rchurgovich@broomfield.org", "IT PM", "Edgewater"),
+    ("Tom Monahan", "tom.monahan@edgewaterit.com", "IT Manager", "Edgewater"),
+    ("Michael Hinman", "michael.hinman@edgewaterit.com", "IT PM", "Edgewater"),
+    ("Dan Aldis", "daldis@halvik.com", "IT Program Manager", "Halvik"),
+    ("Liam Connor", "liam.connor@intercity.technology", "Tech Services Mgr", "Intercity"),
+    ("Mark Hawkins-Wood", "mark.hawkins-wood@intercity.technology", "Head of Cloud", "Intercity"),
+    ("Stewart Nicol", "stewart.nicol@intercity.technology", "Head of Platforms", "Intercity"),
+    ("Rick Korsak", "rick.korsak@intercity.technology", "IT Infra Mgr", "Intercity"),
+    ("Ampem Dako", "ampem.dako@intercity.technology", "Managed IT Mgr", "Intercity"),
+]
+csv_data = "name,email,title,company,city,country" + chr(10)
+for name, email, title, company in leads:
+    csv_data += name + "," + email + "," + title + "," + company + ",," + chr(10)
 
-with open('final_verify.txt', 'w') as f:
-    f.write('from_name = ' + str(cfg.get('from_name','?')))
+boundary = "------brk998877"
+body_bytes = (
+    "--" + boundary + chr(13) + chr(10) +
+    "Content-Disposition: form-data; name=" + chr(34) + "file" + chr(34) + "; filename=" + chr(34) + "m.csv" + chr(34) + chr(13) + chr(10) +
+    "Content-Type: text/csv" + chr(13) + chr(10) + chr(13) + chr(10) +
+    csv_data + chr(13) + chr(10) +
+    "--" + boundary + "--" + chr(13) + chr(10)
+).encode("utf-8")
+
+req = urllib.request.Request(BASE + "/api/import", data=body_bytes,
+    headers={"Content-Type": "multipart/form-data; boundary=" + boundary}, method="POST")
+try:
+    r = urllib.request.urlopen(req, timeout=60)
+    L("Import: " + r.read().decode())
+except urllib.error.HTTPError as e:
+    L("HTTPError " + str(e.code) + ": " + e.read().decode()[:300])
+except Exception as e:
+    L("Error: " + str(e))
+
+L("")
+L("=== FINAL LEAD COUNT ===")
+try:
+    r = urllib.request.urlopen(BASE + "/api/leads?per_page=20", timeout=30)
+    d = json.loads(r.read().decode())
+    L("Total: " + str(d.get("total", 0)))
+    for l in d.get("leads", [])[:15]:
+        L("  - id=" + str(l.get("id")) + " | " + str(l.get("name",""))[:30] + " | " + str(l.get("email",""))[:40])
+except Exception as e:
+    L("Error: " + str(e))
+
+open("final_verify.txt","w").write(chr(10).join(log))
