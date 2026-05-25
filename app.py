@@ -1108,11 +1108,12 @@ def import_csv():
     imported = 0
     for row in reader:
         try:
-            conn.execute("""INSERT OR IGNORE INTO leads (name,email,phone,website,city,country,source,status)
-                VALUES (?,?,?,?,?,?,'uploaded','new')""",
+            conn.execute("""INSERT OR IGNORE INTO leads (name,email,phone,website,city,country,company,title,source,status)
+                VALUES (?,?,?,?,?,?,?,?,'uploaded','new')""",
                 [row.get("name","").strip(), row.get("email","").strip(),
                  row.get("phone","").strip(), row.get("website","").strip(),
-                 row.get("city","").strip(), row.get("country","").strip()])
+                 row.get("city","").strip(), row.get("country","").strip(),
+                 row.get("company","").strip(), row.get("title","").strip()])
             if conn.execute("SELECT changes()").fetchone()[0]: imported += 1
         except Exception: pass
     conn.commit(); conn.close()
