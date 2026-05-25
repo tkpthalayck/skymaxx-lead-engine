@@ -1,0 +1,40 @@
+=== RAW LEAD JSON (first lead) ===
+{
+  "address": null,
+  "campaign_id": null,
+  "category": null,
+  "city": "",
+  "company": null,
+  "country": "",
+  "created_at": "Mon, 25 May 2026 10:59:46 GMT",
+  "email": "abarak@maximaapparel.com",
+  "groups": [],
+  "id": 14,
+  "in_sequence": 0,
+  "intl_phone": null,
+  "maps_url": null,
+  "name": "Aaron Barak",
+  "next_send_at": null,
+  "phone": "",
+  "place_id": null,
+  "rating": 0.0,
+  "replied": 0,
+  "reviews": 0,
+  "sequence_step": 0,
+  "source": "uploaded",
+  "status": "new",
+  "title": null,
+  "unsubscribed": 0,
+  "website": ""
+}
+
+Total leads: 26
+
+=== Test extended debug ===
+  DATABASE_URL_set: True
+  USE_POSTGRES: True
+  db_query_works: True
+  leads_count: 26
+  psycopg2_importable: True
+  psycopg2_version: 2.9.10 (dt dec pq3 ext lo64)
+  python_version: 3.14.3 (main, Feb  9 2026, 23:06:03) [GCC 12.2.0]
