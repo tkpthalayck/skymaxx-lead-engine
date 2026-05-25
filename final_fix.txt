@@ -1,0 +1,36 @@
+=== CHECK DEBUG ENDPOINT ===
+  DATABASE_URL_set: True
+  USE_POSTGRES: True
+  db_query_works: True
+  leads_count: 13
+  psycopg2_importable: True
+  psycopg2_version: 2.9.10 (dt dec pq3 ext lo64)
+  python_version: 3.14.3 (main, Feb  9 2026, 23:06:03) [GCC 12.2.0]
+
+=== RE-IMPORTING WITH PROPER COMPANY COLUMN ===
+Import: {"imported":13}
+
+
+=== VERIFY LEADS WITH COMPANY FIELD ===
+Total: 26
+  - id=26 | Ampem Dako | company=NONE | title=NONE
+  - id=14 | Aaron Barak | company=NONE | title=NONE
+  - id=15 | Chris Kucharski | company=NONE | title=NONE
+  - id=16 | Hank Jackson | company=NONE | title=NONE
+  - id=17 | James Stanford | company=NONE | title=NONE
+  - id=18 | Raymond Churgovich | company=NONE | title=NONE
+  - id=19 | Tom Monahan | company=NONE | title=NONE
+  - id=20 | Michael Hinman | company=NONE | title=NONE
+  - id=21 | Dan Aldis | company=NONE | title=NONE
+  - id=22 | Liam Connor | company=NONE | title=NONE
+  - id=23 | Mark Hawkins-Wood | company=NONE | title=NONE
+  - id=24 | Stewart Nicol | company=NONE | title=NONE
+  - id=25 | Rick Korsak | company=NONE | title=NONE
+
+=== TEST EMAIL TEMPLATE PERSONALIZATION ===
+Test lead: Hank Jackson at NONE
+  Preview HTTPError: 404 <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
