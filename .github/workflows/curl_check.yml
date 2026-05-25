@@ -1,0 +1,43 @@
+name: Curl Check
+on: { push: { paths: ['.github/workflows/curl_check.yml'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          BASE="https://skymaxx-lead-engine.onrender.com"
+          {
+            echo "=== App health (after Postgres adapter deploy) ==="
+            for ep in "/" "/api/config" "/api/stats" "/api/leads" "/api/campaigns" "/api/sequence/templates"; do
+              CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 45 "$BASE$ep")
+              echo "  $ep -> HTTP $CODE"
+            done
+            echo ""
+            echo "=== Total leads in DB ==="
+            curl -s --max-time 30 "$BASE/api/leads?per_page=20" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    print('  Total:', d.get('total', 0))
+    for l in d.get('leads', [])[:5]:
+        print('  -', l.get('name','')[:30], '|', l.get('email','')[:35])
+except Exception as e:
+    print('  Parse error:', e)
+"
+            echo ""
+            echo "=== Test creating a campaign (verify all endpoints work) ==="
+            curl -s -X POST "$BASE/api/campaigns/draft" \
+              -H "Content-Type: application/json" \
+              -d '{"name":"Healthcheck Test","lead_ids":[]}' \
+              --max-time 30 | head -c 500
+          } > curl_check.txt 2>&1
+          cat curl_check.txt
+      - if: always()
+        run: |
+          git config user.email "bot@skymaxx.company"
+          git config user.name "Bot"
+          git add -f curl_check.txt || true
+          git diff --staged --quiet || git commit -m "v [skip ci]"
+          git push || true
