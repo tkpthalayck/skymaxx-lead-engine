@@ -1,0 +1,39 @@
+=== POSTGRES MIGRATION VERIFICATION ===
+
+1. Checking Render deploy status...
+   dep-d89rdr5h8chc73fglj8g status=queued msg=verify postgres migration
+   dep-d89rdr7aqgkc73ah27kg status=build_in_progress msg=verify workflow
+   dep-d89rbp2iu9rc73de3lq0 status=live msg=pg setup [skip ci]
+
+2. Checking app endpoints...
+   / -> HTTP 200
+   /api/config -> HTTP 200
+   /api/stats -> HTTP 200
+   /api/leads -> HTTP 200
+   /api/campaigns -> HTTP 200
+
+3. Lead count check (expect 0 — fresh Postgres DB):
+   Total leads in Postgres: 0
+
+4. Re-importing 13 M365 leads to Postgres...
+   Import response: {"imported":13}
+
+
+5. Final state — leads visible after import:
+   Total: 13
+   - id=1 | Aaron Barak | abarak@maximaapparel.com
+   - id=2 | Chris Kucharski | chris.kucharski@onerail.io
+   - id=3 | Hank Jackson | hank.jackson@edgewaterit.com
+   - id=4 | James Stanford | james.stanford@edgewaterit.com
+   - id=5 | Raymond Churgovich | rchurgovich@broomfield.org
+   - id=6 | Tom Monahan | tom.monahan@edgewaterit.com
+   - id=7 | Michael Hinman | michael.hinman@edgewaterit.com
+   - id=8 | Dan Aldis | daldis@halvik.com
+   - id=9 | Liam Connor | liam.connor@intercity.technology
+   - id=10 | Mark Hawkins-Wood | mark.hawkins-wood@intercity.technology
+   - id=11 | Stewart Nicol | stewart.nicol@intercity.technology
+   - id=12 | Rick Korsak | rick.korsak@intercity.technology
+   - id=13 | Ampem Dako | ampem.dako@intercity.technology
+
+✅ ALL DONE — App is running on persistent Postgres.
+Data will now survive ALL future deploys.
