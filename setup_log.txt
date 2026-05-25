@@ -1,0 +1,56 @@
+=== RENDER POSTGRES SETUP ===
+
+1. Getting Render account/owner ID...
+   Owner ID: tea-d88q6frbc2fs73eh5rmg
+
+2. Checking for existing Postgres databases...
+
+3. Creating new free Postgres database...
+   Created DB: dpg-d89r9om7r5hc73dq43cg-a
+   Plan: free | Region: oregon | Version: 16
+
+4. Waiting for database to become available...
+   [1] status: creating
+   [2] status: creating
+   [3] status: creating
+   [4] status: creating
+   [5] status: creating
+   [6] status: creating
+   [7] status: creating
+   [8] status: creating
+   [9] status: creating
+   [10] status: creating
+   [11] status: creating
+   [12] status: creating
+   [13] status: creating
+   [14] status: creating
+   [15] status: creating
+   [16] status: creating
+   [17] status: creating
+   [18] status: creating
+   [19] status: creating
+   [20] status: creating
+   [21] status: creating
+   [22] status: creating
+   [23] status: creating
+   [24] status: creating
+   [25] status: creating
+   [26] status: available
+
+5. Fetching connection info...
+   Internal URL available: True
+   External URL available: True
+   Using: INTERNAL
+   Connection: postgresql://skymaxx_user:lw6dV37WQjxexQPfOQhV79Y7...
+
+6. Setting DATABASE_URL env var on web service...
+   ✓ DATABASE_URL set (10 total env vars)
+
+7. Triggering redeploy with new DATABASE_URL...
+   ✓ Deploy triggered: dep-d89rbolckfvc738tub1g
+
+✅ SETUP COMPLETE
+Render will redeploy in ~2-3 minutes, then the app will use Postgres.
+Data will persist across all future deploys.
+
+Database ID: dpg-d89r9om7r5hc73dq43cg-a
