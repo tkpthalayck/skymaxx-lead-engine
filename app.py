@@ -379,6 +379,8 @@ def _init_pg_schema(conn):
             id SERIAL PRIMARY KEY, lead_id INTEGER NOT NULL, group_id INTEGER NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(lead_id, group_id)
         )""",
+        "ALTER TABLE leads ADD COLUMN IF NOT EXISTS company TEXT",
+        "ALTER TABLE leads ADD COLUMN IF NOT EXISTS title TEXT",
         "CREATE INDEX IF NOT EXISTS idx_leads_sequence ON leads(in_sequence, next_send_at)",
         "CREATE INDEX IF NOT EXISTS idx_log_sent_at ON email_log(sent_at)",
         "CREATE INDEX IF NOT EXISTS idx_track_log ON tracking_events(log_id)",
@@ -535,6 +537,17 @@ def init_db():
         except Exception: pass
 
     conn.commit()
+    # ── Idempotent column additions (safe on both fresh and existing DBs) ──
+    for col_sql in [
+        "ALTER TABLE leads ADD COLUMN company TEXT",
+        "ALTER TABLE leads ADD COLUMN title TEXT",
+    ]:
+        try:
+            conn.execute(col_sql)
+            conn.commit()
+        except Exception:
+            pass  # column already exists
+
     conn.close()
 
 init_db()
@@ -563,12 +576,23 @@ def increment_send_count():
 def personalize(text, lead):
     full_name = (lead.get("name") or "").strip()
     first_name = full_name.split()[0] if full_name else "there"
+    # Smart company resolution: explicit column > email domain > fallback
+    company = (lead.get("company") or "").strip()
+    if not company:
+        email = (lead.get("email") or "").strip()
+        if "@" in email:
+            domain = email.split("@")[1].lower()
+            base = domain.split(".")[0]
+            # Common transformations: maximaapparel → Maxima Apparel
+            company = base.replace("-", " ").replace("_", " ").title()
+        if not company:
+            company = "your business"
     return (text.replace("{{first_name}}", first_name)
                 .replace("{{name}}", first_name)
                 .replace("{{sender_name}}", FROM_NAME)
-                .replace("{{company}}", lead.get("name", "your company"))
-                .replace("{{city}}", lead.get("city", "your area"))
-                .replace("{{website}}", lead.get("website", "")))
+                .replace("{{company}}", company)
+                .replace("{{city}}", lead.get("city", "your area") or "your area")
+                .replace("{{website}}", lead.get("website", "") or ""))
 
 def inject_tracking(html_body, log_id):
     """Add tracking pixel + rewrite links for open/click tracking."""
