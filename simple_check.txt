@@ -1,0 +1,58 @@
+=== Render deploy status ===
+[
+    {
+        "deploy": {
+            "id": "dep-d89r0ve7r5hc73d8j2gg",
+            "commit": {
+                "id": "36b1b150695298a13600766c4a8ef5f44add8995",
+                "message": "simple workflow",
+                "createdAt": "2026-05-25T02:14:20Z"
+            },
+            "status": "build_in_progress",
+            "trigger": "new_commit",
+            "createdAt": "2026-05-25T02:14:21.544573Z",
+            "updatedAt": "2026-05-25T02:14:21.544573Z",
+            "startedAt": "2026-05-25T02:14:21.500589Z"
+        },
+        "cursor": "QfBlXuhBXjkwdmU3cjVoYzczZDhqMmdn"
+    },
+    {
+        "deploy": {
+            "id": "dep-d89qv8qiu9rc73ddskb0",
+            "commit": {
+                "id": "b33163ce6c7f72ad3ce11fda10387f08d1c37338",
+                "message": "Trigger health check",
+                "createdAt": "2026-05-25T02:10:41Z"
+            },
+            "status": "live",
+            "trigger": "new_commit",
+            "createdAt": "2026-05-25T02:10:43.743854Z",
+            "updatedAt": "2026-05-25T02:13:29.784577Z",
+            "startedAt": "2026-05-25T02:11:30.419707Z",
+            "finishedAt": "2026-05-25T02:13:06.432066Z"
+        },
+        "cursor": "m8M7iIWScvB2OHFpdTlyYzczZGRza2Iw"
+    },
+    {
+        "deploy": {
+            "id": "dep-d89qv8m7r5hc73d8idr0",
+            "commit": {
+                "id": "8684a030623e5262800da929132633dd147a5633",
+                "message": "Add health check workflow",
+                "createdAt": "2026-05-25T02:10:41Z"
+            },
+            "status": "deactivated",
+            "trigger": "new_commit",
+            "createdAt": "2026-05-25T02:10:42.854248Z",
+            "updatedAt": "2026-05-25T02:13:06.431189Z",
+            "startedAt": "2026-05-25T02:10:42.807083Z",
+            "finishedAt": "2026-05-25T02:11:30.118924Z"
+        },
+        "cursor": "m8M7iIWScvB2OG03cjVoYzczZDhpZHIw"
+
+=== App endpoints ===
+/ -> HTTP 200
+/api/config -> HTTP 200
+/api/stats -> HTTP 200
+/api/leads -> HTTP 200
+/api/campaigns -> HTTP 200
