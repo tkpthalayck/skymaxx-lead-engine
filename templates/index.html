@@ -724,6 +724,23 @@ function tab(name, el) {
 
   if (name==='sent') loadLog();
   if (name==='replies') loadReplies();
+  if (name==='campaigns') loadCampaigns();
+  if (name==='groups') loadGroups();
+  if (name==='leads' && typeof loadLeads === 'function') loadLeads(typeof leadsPage !== 'undefined' ? leadsPage : 1);
+  // Track current tab for auto-refresh
+  window.currentTab = name;
+}
+
+// ── Auto-refresh currently visible tab every 15s ──
+if (typeof window.__autoRefreshStarted === 'undefined') {
+  window.__autoRefreshStarted = true;
+  setInterval(() => {
+    const t = window.currentTab || 'dashboard';
+    if (t === 'campaigns' && typeof loadCampaigns === 'function') loadCampaigns();
+    if (t === 'sent' && typeof loadLog === 'function') loadLog();
+    if (t === 'replies' && typeof loadReplies === 'function') loadReplies();
+    if (t === 'leads' && typeof loadLeads === 'function') loadLeads(typeof leadsPage !== 'undefined' ? leadsPage : 1);
+  }, 15000);
 }
 
 // ─── STATS ───
@@ -1685,11 +1702,16 @@ async function campaignAction(action) {
       method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'
     }).then(r=>r.json());
     if (r.approved) {
-      alert('✓ Campaign approved!\n\n' + r.enrolled + ' leads enrolled in the sequence.\nThe scheduler will start sending Email 1 within 60 seconds.');
+      alert('✓ Campaign approved!\n\n' + r.enrolled + ' leads enrolled in the sequence.\nThe scheduler will start sending Email 1 within 60 seconds.\n\nSwitching you to the Campaigns tab so you can watch it run.');
       closeApprovalModal();
       if (typeof selected !== 'undefined') selected.clear();
       if (typeof loadStats === 'function') loadStats();
       if (typeof loadLeads === 'function') loadLeads(typeof leadsPage !== 'undefined' ? leadsPage : 1);
+      // Switch to Campaigns tab so user sees the approved campaign immediately
+      const campTab = document.querySelector('[onclick*="tab(\'campaigns\'"]') ||
+                      document.querySelector('[onclick*="campaigns"]');
+      if (campTab) tab('campaigns', campTab);
+      else if (typeof loadCampaigns === 'function') loadCampaigns();
     } else {
       alert('Failed: ' + (r.error || 'unknown error'));
     }
