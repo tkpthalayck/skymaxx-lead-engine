@@ -1,0 +1,29 @@
+=== DB DEBUG ENDPOINT ===
+  DATABASE_URL_prefix: postgresql://skymaxx_user:lw6d
+  DATABASE_URL_set: True
+  USE_POSTGRES: False
+  db_query_works: True
+  leads_count: 0
+  psycopg2_error: /opt/render/project/src/.venv/lib/python3.14/site-packages/psycopg2/_psycopg.cpython-314-x86_64-linux-gnu.so: undefined symbol: _PyInterpreterState_Get
+  psycopg2_importable: False
+  python_version: 3.14.3 (main, Feb  9 2026, 23:06:03) [GCC 12.2.0]
+
+=== ATTEMPTING LEAD RE-IMPORT ===
+Import: {"imported":13}
+
+
+=== POST-IMPORT STATE ===
+Total: 13
+  - id=1 | Aaron Barak | abarak@maximaapparel.com
+  - id=2 | Chris Kucharski | chris.kucharski@onerail.io
+  - id=3 | Hank Jackson | hank.jackson@edgewaterit.com
+  - id=4 | James Stanford | james.stanford@edgewaterit.com
+  - id=5 | Raymond Churgovich | rchurgovich@broomfield.org
+  - id=6 | Tom Monahan | tom.monahan@edgewaterit.com
+  - id=7 | Michael Hinman | michael.hinman@edgewaterit.com
+  - id=8 | Dan Aldis | daldis@halvik.com
+  - id=9 | Liam Connor | liam.connor@intercity.technology
+  - id=10 | Mark Hawkins-Wood | mark.hawkins-wood@intercity.technology
+  - id=11 | Stewart Nicol | stewart.nicol@intercity.technology
+  - id=12 | Rick Korsak | rick.korsak@intercity.technology
+  - id=13 | Ampem Dako | ampem.dako@intercity.technology
