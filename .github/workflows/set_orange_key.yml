@@ -1,0 +1,8 @@
+name: SetOrangeKey
+on: { workflow_dispatch: , push: { paths: ['set_orange_key.py'] } }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 set_orange_key.py
