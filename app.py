@@ -715,6 +715,38 @@ def stats():
 @app.route("/api/cities")
 def cities(): return jsonify(UAE_GCC_CITIES)
 
+
+@app.route("/api/debug/db")
+def debug_db():
+    """Diagnostic — tells us which DB is in use and why."""
+    import sys as _sys
+    info = {
+        "USE_POSTGRES": bool(USE_POSTGRES),
+        "DATABASE_URL_set": bool(DATABASE_URL),
+        "DATABASE_URL_prefix": DATABASE_URL[:30] if DATABASE_URL else "",
+        "python_version": _sys.version,
+    }
+    # Try importing psycopg2
+    try:
+        import psycopg2
+        info["psycopg2_importable"] = True
+        info["psycopg2_version"] = psycopg2.__version__
+    except ImportError as e:
+        info["psycopg2_importable"] = False
+        info["psycopg2_error"] = str(e)
+    # Try a live DB query
+    try:
+        conn = get_db()
+        cur = conn.execute("SELECT COUNT(*) FROM leads")
+        row = cur.fetchone()
+        info["leads_count"] = row[0] if row else 0
+        info["db_query_works"] = True
+        conn.close()
+    except Exception as e:
+        info["db_query_works"] = False
+        info["db_query_error"] = str(e)[:300]
+    return jsonify(info)
+
 @app.route("/api/sequence/templates")
 def get_templates(): return jsonify(SEQUENCE_TEMPLATES)
 
