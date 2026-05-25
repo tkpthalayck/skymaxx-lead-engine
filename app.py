@@ -740,6 +740,49 @@ def stats():
 def cities(): return jsonify(UAE_GCC_CITIES)
 
 
+
+@app.route("/api/debug/test_insert")
+def debug_test_insert():
+    """Test INSERT with company field directly."""
+    import time as _t
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "INSERT INTO leads (name, email, company, title, source, status) VALUES (?, ?, ?, ?, ?, ?)",
+            ["Test User", f"test_{int(_t.time())}@debug.local", "Test Company Inc", "Test CTO", "uploaded", "new"]
+        )
+        conn.commit()
+        new_id = cur.lastrowid
+        # Read it back
+        row = conn.execute("SELECT id, name, email, company, title FROM leads WHERE id = ?", [new_id]).fetchone()
+        result = {"insert_ok": True, "lastrowid": new_id, "readback": dict(row) if row else None}
+    except Exception as e:
+        result = {"insert_ok": False, "error": str(e)[:300]}
+    finally:
+        conn.close()
+    return jsonify(result)
+
+
+@app.route("/api/debug/cleanup_dupes", methods=["POST"])
+def debug_cleanup_dupes():
+    """Delete all leads from the database (CAUTION — full reset)."""
+    conn = get_db()
+    try:
+        # First, count what we have
+        before = conn.execute("SELECT COUNT(*) FROM leads").fetchone()[0]
+        # Delete from related tables first to avoid FK issues
+        conn.execute("DELETE FROM lead_group_assignments")
+        conn.execute("DELETE FROM email_log")
+        conn.execute("DELETE FROM tracking_events")
+        conn.execute("DELETE FROM leads")
+        conn.commit()
+        result = {"ok": True, "deleted": before}
+    except Exception as e:
+        result = {"ok": False, "error": str(e)[:300]}
+    finally:
+        conn.close()
+    return jsonify(result)
+
 @app.route("/api/debug/db")
 def debug_db():
     """Diagnostic — tells us which DB is in use and why."""
