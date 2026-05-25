@@ -1,0 +1,24 @@
+=== VERIFY UPDATED EMAIL SEQUENCE ===
+
+/api/sequence/templates -> HTTP 200
+Templates returned: 5
+  Step 1 (Day +0): 1 in 323 emails to SMBs is malicious — quick note on {{company}}
+  Step 2 (Day +3): Three numbers from IBM that may be worth a minute
+  Step 3 (Day +7): 43% of M365 breaches start the same 5 ways
+  Step 4 (Day +14): 61% of SMBs were breached last year — what we see in their tenants
+  Step 5 (Day +21): Closing the file — and 4 free resources for {{company}}
+
+Sample (Email 1) checks:
+  Has Verizon DBIR mention: True
+  Has source link: True
+  Has IBM ref: True
+  Has Microsoft.com link: True
+  Body length email 1: 4558 bytes
+
+=== SENT TAB DATA STATE ===
+/api/log -> HTTP 200
+Total emails in email_log table: 0
+
+Total leads: 0
+Leads in active sequence: 0
+Total campaigns: 0
