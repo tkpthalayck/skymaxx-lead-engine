@@ -1,0 +1,16 @@
+=== RENDER LOG INVESTIGATION ===
+
+Waiting 60s for any in-progress deploy...
+Latest live deploy: dep-d8a2e3aiu9rc73di4fog
+  Commit: diag [skip ci]
+
+Fetching service logs...
+HTTP 200
+Got 100 log entries
+  [2026-05-25T10:42:01] Installing collected packages: urllib3, python-dotenv, psycopg2-binary, packaging, MarkupSafe, itsdangerous, idna, click, charset-normalizer, certifi, blinker, Werkzeug, requests, Jinja2, gunicorn, flask, flask-cors
+  [2026-05-25T10:42:01] [WARN] psycopg2 not installed — falling back to SQLite
+  [2026-05-25T10:42:04] Successfully installed Jinja2-3.1.6 MarkupSafe-3.0.3 Werkzeug-3.1.8 blinker-1.9.0 certifi-2026.5.20 charset-normalizer-3.4.7 click-8.4.1 flask-3.0.3 flask-cors-4.0.1 gunicorn-22.0.0 idna-3.16 itsdangerous-2.2.0 packaging-26.2 psycopg2-binary-2.9.9 py
+
+Live app check:
+  Total: 0
+  Leads visible: 0
