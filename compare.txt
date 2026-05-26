@@ -1,0 +1,14 @@
+Fetched URL: https://skymaxx-lead-engine.onrender.com/?_=1779764491
+HTML size: 115601
+
+=== <aside> first 2000 chars ===
+<aside class="sidebar">
+
+=== Searches in served HTML ===
+  ⚡: appears 1 times
+  SKYMAXX: appears 3 times
+  logo.png: appears 0 times
+  favicon: appears 0 times
+  goHome: appears 0 times
+  /static/: appears 0 times
+
