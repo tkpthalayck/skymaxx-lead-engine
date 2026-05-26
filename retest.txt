@@ -1,0 +1,31 @@
+=== RETEST Quick Search ===
+
+Test A: Quick Search NO category, NO keyword, has country+state
+  HTTP 502 in 0.0s
+  Body: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>502</title>
+    <style>@font-face {
+  font-family: "Roobert";
+  font-weight: 500;
+  font-style: normal;
+  font-stretch: normal;
+  src: url("data:font/woff2;base64,d09GMk9UVE8AAKewAAwAAAABa6QAAKdfAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAADYKmehqCHhuC4UocpRQGYACLBgE2AiQDkygEBgWFRwcgW8pqkQKZcr0u0nk2H+gc25rBL5CqkDOqYXNqo87dNmL1mgByHi4yIGwcgLFJz2f/////f/pSkaHK
+
+Test B: Quick Search WITH category (regression)
+  HTTP 200 in 9.6s
+  found: 20
+  search_all_categories: False
+    - Quantum IT Solutions LLC
+    - Norms Technologies LLC
+
+Test C: Quick Search no category, in UAE (faster region)
+  HTTP 200 in 9.5s
+  search_all_categories: True
+  found: 20
+    - DANA Group of Companies | category: establishment, point_of_intere
+    - Boehringer Ingelheim united arab em | category: establishment, health, point_o
+    - Join Hub Gulf Pharma | pharmaceutic | category: establishment, health, point_o
