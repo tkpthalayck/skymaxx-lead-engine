@@ -363,6 +363,18 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
       <div class="card">
         <div class="card-title"><i class="fas fa-bullseye"></i> Quick Search <span class="right">Single combination, fast results with full contact details</span></div>
 
+        <div class="form-row" id="qs-source-row">
+          <div class="form-group" style="flex:1">
+            <label><i class="fas fa-database"></i> Data Source</label>
+            <select id="qs-source" onchange="qsSourceChanged()">
+              <option value="google_maps">🗺️ Google Maps — Local Businesses (default)</option>
+              <option value="orange_slice">🔶 Orange Slice — LinkedIn Profiles (1.15B people, 85M companies)</option>
+            </select>
+            <div id="qs-source-hint" style="font-size:.78em;opacity:.7;margin-top:4px">
+              Google Maps finds local businesses by category and location. Best for SMB outreach.
+            </div>
+          </div>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label><i class="fas fa-globe-asia"></i> Country</label>
@@ -1484,41 +1496,63 @@ function qsClearFilters() {
 }
 
 async function quickSearchV2() {
-  const country = document.getElementById('qs-country').selectedOptions[0]?.textContent?.split(' (')[0] || '';
-  const state   = document.getElementById('qs-state').value;
-  const city    = document.getElementById('qs-city-input').value;
-  const category= document.getElementById('qs-category').value;
-  const title   = document.getElementById('qs-title').value;
-  const keyword = document.getElementById('qs-keyword').value;
-  if (!(country || state || city)) { alert('Pick at least a Country, State, or City'); return; }
-  if (!category && !keyword) { alert('Pick a Business Category or enter a Custom Keyword'); return; }
+  const country  = document.getElementById('qs-country').value;
+  const state    = document.getElementById('qs-state').value;
+  const city     = document.getElementById('qs-city-input').value.trim();
+  const cat      = document.getElementById('qs-category').value;
+  const title    = document.getElementById('qs-title').value;
+  const keyword  = document.getElementById('qs-keyword').value.trim();
+  const source   = document.getElementById('qs-source')?.value || 'google_maps';
+  const status   = document.getElementById('qs-status');
+  const btn      = document.getElementById('qs-btn');
 
-  const btn = document.getElementById('qs-btn');
-  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>';
-  document.getElementById('qs-status').innerHTML = '<div class="alert alert-info"><div class="spinner"></div><div>Searching Google Maps...</div></div>';
+  if (!country) { status.innerHTML = '<span style="color:#f59e0b">Please pick a country.</span>'; return; }
+  if (source === 'orange_slice' && !title && !keyword) {
+    status.innerHTML = '<span style="color:#fb923c">For Orange Slice, please provide a Job Title or Keyword.</span>'; return;
+  }
+  if (source === 'google_maps' && !cat && !keyword) {
+    status.innerHTML = '<span style="color:#f59e0b">Please pick a category or enter a custom keyword.</span>'; return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching ' + (source === 'orange_slice' ? 'LinkedIn (Orange Slice)' : 'Google Maps') + '...';
+  status.innerHTML = '';
+
+  // Get country name from select option
+  const countrySelect = document.getElementById('qs-country');
+  const countryName = countrySelect.options[countrySelect.selectedIndex]?.text?.replace(/\s*\([A-Z]{2}\)$/,'') || country;
 
   try {
-    const r = await fetch('/api/search/v2/preview', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({country, state, city, category, job_title:title, keyword})
-    }).then(r=>r.json());
-    btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Search';
-    if (r.error) {
-      document.getElementById('qs-status').innerHTML = `<div class="alert alert-error">${escapeHtml(r.error)}</div>`;
+    const resp = await fetch('/api/search/v2/preview', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        source: source,
+        country: source === 'orange_slice' ? countryName : country,
+        state: state,
+        city: city,
+        category: cat,
+        title: title,
+        keyword: keyword,
+        limit: source === 'orange_slice' ? 25 : 20
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      status.innerHTML = '<span style="color:#ef4444">Error: ' + (data.error || resp.status) + '</span>';
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Search';
       return;
     }
-    qsResults = r.results || [];
-    qsSelected.clear();
-    let statusHtml = `<div class="alert alert-success"><i class="fas fa-check"></i><div><strong>${r.found} businesses found</strong> for: <code>${escapeHtml(r.query)}</code></div></div>`;
-    if (r.note) statusHtml += `<div class="alert alert-warn"><i class="fas fa-info-circle"></i><div>${escapeHtml(r.note)}</div></div>`;
-    document.getElementById('qs-status').innerHTML = statusHtml;
-    renderQSResults();
-    document.getElementById('qs-results-card').style.display = 'block';
-    // Kick off email enrichment in background
-    enrichEmailsInBackground();
+    const results = data.results || [];
+    window.qsLastResults = results;
+    window.qsLastSource = source;
+    renderQsResults(results, source);
+    status.innerHTML = '<span style="color:#34d399">Found ' + results.length + ' results from ' + (source === 'orange_slice' ? 'Orange Slice / LinkedIn' : 'Google Maps') + '</span>';
   } catch(e) {
-    btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Search';
-    document.getElementById('qs-status').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    status.innerHTML = '<span style="color:#ef4444">Network error: ' + e.message + '</span>';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-search"></i> Search';
   }
 }
 
@@ -1987,6 +2021,62 @@ async function init2() {
 setTimeout(initV2Search, 1800);
 
 init();
+
+function qsSourceChanged() {
+  const src = document.getElementById('qs-source').value;
+  const hint = document.getElementById('qs-source-hint');
+  const catGroup = document.getElementById('qs-category')?.closest('.form-group');
+  const titleField = document.getElementById('qs-title');
+  const titleLabel = titleField?.closest('.form-group')?.querySelector('label');
+
+  if (src === 'orange_slice') {
+    hint.textContent = '🔶 Searches LinkedIn profiles via Ocean.io. Best for B2B targeting by job title + location. Job Title is REQUIRED. Email enrichment uses credits.';
+    hint.style.color = '#fb923c';
+    // Job title becomes required hint
+    if (titleLabel) titleLabel.innerHTML = '<i class="fas fa-user-tie"></i> Job Title <span style="color:#fb923c;text-transform:none;font-weight:400">(REQUIRED — comma-separated for multiple)</span>';
+    // Category becomes less prominent
+    if (catGroup) catGroup.style.opacity = '0.5';
+  } else {
+    hint.textContent = 'Google Maps finds local businesses by category and location. Best for SMB outreach.';
+    hint.style.color = '';
+    if (titleLabel) titleLabel.innerHTML = '<i class="fas fa-user-tie"></i> Job Title <span style="text-transform:none;font-weight:400;opacity:.6">(optional, keyword filter)</span>';
+    if (catGroup) catGroup.style.opacity = '1';
+  }
+}
+
+async function linkedinGetEmail(idx) {
+  const r = window.qsLastResults?.[idx];
+  if (!r || !r.linkedinUrl) { alert('No LinkedIn URL for this lead'); return; }
+  const btn = document.getElementById('qs-email-btn-' + idx);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fetching...'; }
+  try {
+    const resp = await fetch('/api/linkedin/enrich_contact', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        linkedinUrl: r.linkedinUrl,
+        firstName: r.firstName || '',
+        lastName:  r.lastName  || '',
+        company:   r.company   || '',
+        required:  ['email','work_email']
+      })
+    });
+    const data = await resp.json();
+    if (data.ok && (data.email || data.work_email)) {
+      r.email = data.email || data.work_email;
+      // Update UI
+      const cell = document.getElementById('qs-email-cell-' + idx);
+      if (cell) cell.innerHTML = '<span style="color:#34d399">✓ ' + r.email + '</span>';
+      if (btn) btn.style.display = 'none';
+    } else {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-times"></i> Not found'; }
+    }
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-exclamation"></i> Error'; }
+    alert('Error: ' + e.message);
+  }
+}
+
 </script>
 
 <!-- ─── Approval Modal ─── -->
