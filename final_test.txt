@@ -1,0 +1,35 @@
+============================================================
+FINAL END-TO-END TEST
+============================================================
+
+TEST 1: Quick Search — Orange Slice (LinkedIn) — IT Manager UAE
+  HTTP 200 in 2.5s | Source: orange_slice | Count: 50
+    - Sergey Barysiuk           | CTO, co-founder           | PandaDoc
+    - Keith Rabkin              | Chief Executive Officer   | PandaDoc
+    - Richard Bray              | CFO                       | PandaDoc
+
+TEST 2: Bulk Search — Orange Slice — IT Manager + CTO in UAE+SA
+  HTTP 200 in 2.8s | Source: orange_slice | Found: 50
+    - Sergey Barysiuk           | CTO, co-founder           | PandaDoc
+    - Keith Rabkin              | Chief Executive Officer   | PandaDoc
+    - Richard Bray              | CFO                       | PandaDoc
+
+TEST 3: Save sample Orange Slice results to leads DB
+  HTTP 200 | Saved: 1 | IDs: [72]
+  Total leads now: 14
+    id=72 | Sergey Barysiuk           | website=https://www.linkedin.com/in/siarheibarysiuk
+    id=60 | Chris Kucharski           | website=
+    id=61 | Hank Jackson              | website=
+    id=62 | James Stanford            | website=
+    id=59 | Aaron Barak               | website=
+
+TEST 4: REGRESSION — Quick Search Google Maps — IT in Wyoming, US
+  Err: Expecting value: line 1 column 1 (char 0) | Body: 
+
+TEST 5: Frontend dropdowns (both Quick + Bulk)
+  qs-source dropdown            : ✓ YES
+  bulk-source dropdown          : ✗ NO
+  qsSourceChanged               : ✓ YES
+  bulkSourceChanged             : ✗ NO
+  Source param in bulk          : ✗ NO
+  linkedinGetEmail              : ✓ YES
