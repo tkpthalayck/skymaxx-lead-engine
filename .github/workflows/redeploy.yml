@@ -1,0 +1,17 @@
+name: Redeploy
+on: { workflow_dispatch: , push: { paths: ['redeploy.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 redeploy.py
+      - if: always()
+        run: |
+          git config user.email "b@s.c"
+          git config user.name "B"
+          git add -f redeploy.txt 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "redeploy [skip ci]"
+          git push || true
