@@ -770,24 +770,45 @@ if (typeof window.__autoRefreshStarted === 'undefined') {
 
 // ─── STATS ───
 async function loadStats() {
-  const s = await fetch('/api/stats').then(r=>r.json());
-  document.getElementById('s-total').textContent = s.total_leads;
-  document.getElementById('s-email').textContent = s.with_email + ' with email';
-  document.getElementById('s-seq').textContent = s.in_sequence;
-  document.getElementById('s-rep').textContent = s.replied;
-  document.getElementById('s-today').textContent = s.today_sent;
-  document.getElementById('s-limit').textContent = '/ ' + s.daily_limit + ' daily limit';
-  document.getElementById('s-total-sent').textContent = s.total_sent || 0;
-  document.getElementById('s-failed').textContent = (s.total_failed||0) + ' failed';
-  if (s.total_leads > 0) {
-    const b = document.getElementById('nav-leads-count');
-    b.style.display = 'inline-block';
-    b.textContent = s.total_leads;
-  }
-  if (s.replied > 0) {
-    const b = document.getElementById('nav-replies-count');
-    b.style.display = 'inline-block';
-    b.textContent = s.replied;
+  try {
+    // 8s timeout — if stats hangs, fail gracefully instead of leaving "—" forever
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch('/api/stats', { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const s = await resp.json();
+
+    document.getElementById('s-total').textContent       = s.total_leads ?? 0;
+    document.getElementById('s-email').textContent       = (s.with_email ?? 0) + ' with email';
+    document.getElementById('s-seq').textContent         = s.in_sequence ?? 0;
+    if (document.getElementById('s-rep'))   document.getElementById('s-rep').textContent   = s.replied ?? 0;
+    if (document.getElementById('s-today')) document.getElementById('s-today').textContent = s.today_sent ?? 0;
+    if (document.getElementById('s-limit')) document.getElementById('s-limit').textContent = '/ ' + (s.daily_limit ?? 300) + ' daily limit';
+    if (document.getElementById('s-total-sent')) document.getElementById('s-total-sent').textContent = s.total_sent ?? 0;
+    if (document.getElementById('s-failed'))     document.getElementById('s-failed').textContent     = (s.total_failed ?? 0) + ' failed';
+
+    if ((s.total_leads ?? 0) > 0) {
+      const b = document.getElementById('nav-leads-count');
+      if (b) { b.style.display = 'inline-block'; b.textContent = s.total_leads; }
+    }
+    if ((s.replied ?? 0) > 0) {
+      const b = document.getElementById('nav-replies-count');
+      if (b) { b.style.display = 'inline-block'; b.textContent = s.replied; }
+    }
+  } catch(e) {
+    console.warn('loadStats failed:', e.message);
+    // Fallback: try to read from /api/leads to at least show total_leads
+    try {
+      const fallback = await fetch('/api/leads?per_page=1').then(r=>r.json());
+      const total = fallback.total ?? 0;
+      document.getElementById('s-total').textContent = total;
+      document.getElementById('s-email').textContent = '— (stats slow)';
+    } catch(e2) {
+      document.getElementById('s-total').textContent = '!';
+      document.getElementById('s-email').textContent = 'connection error';
+    }
   }
 }
 
@@ -1221,7 +1242,7 @@ function renderQSResults() {
       // Orange Slice / LinkedIn — show LinkedIn + Title + Company + Location
       const emailBlock = r.email
         ? '<span><i class="fas fa-envelope"></i><span style="color:#34d399">✓ ' + r.email + '</span> <span style="color:#34d399;font-size:9px">verified</span></span>'
-        : '<span><i class="fas fa-envelope-open" style="color:var(--muted)"></i><button class="btn btn-outline btn-xs" onclick="event.stopPropagation(); linkedinGetEmail(\'' + r.place_id + '\')" id="getemail-' + r.place_id + '" title="Get verified email via Orange Slice (uses credits)"><i class="fas fa-envelope"></i> Get Email</button></span>';
+        : '<span><i class="fas fa-envelope-open" style="color:var(--muted)"></i><button class="btn btn-outline btn-xs" disabled style="opacity:0.5;cursor:not-allowed" title="🔒 Orange Slice credit usage is locked. Email enrichment is disabled to prevent unexpected charges."><i class="fas fa-lock"></i> Get Email (locked)</button></span>';
       metaHtml =
         emailBlock +
         (r.jobTitle ? '<span><i class="fas fa-user-tie"></i>' + escapeHtml(r.jobTitle) + '</span>' : '') +
@@ -2087,11 +2108,9 @@ function qsSourceChanged() {
   const titleLabel = titleField?.closest('.form-group')?.querySelector('label');
 
   if (src === 'orange_slice') {
-    hint.textContent = '🔶 Searches LinkedIn profiles via Ocean.io. Best for B2B targeting by job title + location. Job Title is REQUIRED. Email enrichment uses credits.';
-    hint.style.color = '#fb923c';
-    // Job title becomes required hint
+    hint.innerHTML = '🔒 <strong>Credit usage LOCKED</strong> — Search is FREE (returns LinkedIn profiles) but the "Get Email" button is disabled to prevent unexpected Orange Slice charges. We are evaluating their pricing.';
+    hint.style.color = '#fbbf24';
     if (titleLabel) titleLabel.innerHTML = '<i class="fas fa-user-tie"></i> Job Title <span style="color:#fb923c;text-transform:none;font-weight:400">(REQUIRED — comma-separated for multiple)</span>';
-    // Category becomes less prominent
     if (catGroup) catGroup.style.opacity = '0.5';
   } else {
     hint.textContent = 'Google Maps finds local businesses by category and location. Best for SMB outreach.';
