@@ -2494,6 +2494,103 @@ def search_v2_enrich_emails():
 
 @app.route("/api/search/v2/bulk_preview", methods=["POST"])
 def search_v2_bulk_preview():
+    # NEW: Route bulk search to Orange Slice when source set
+    _data = request.get_json(silent=True) or {}
+    _source = (_data.get("source") or "google_maps").strip().lower()
+    if _source == "orange_slice":
+        if not _orange.is_configured():
+            return jsonify({"error": "ORANGESLICE_API_KEY not configured on server"}), 400
+        countries  = _data.get("countries") or []
+        states     = _data.get("states") or []
+        titles_in  = _data.get("job_titles") or _data.get("titles") or []
+        categories = _data.get("categories") or []  # used as title fallback if no titles
+        if not titles_in and not categories:
+            return jsonify({"error": "Pick at least one Job Title (Orange Slice searches by title)"}), 400
+
+        titles_list = titles_in if titles_in else categories[:5]
+        if not titles_list:
+            return jsonify({"error": "No titles specified"}), 400
+
+        # Build location combos
+        location_combos = []
+        if countries and states:
+            for c in countries:
+                for s in states:
+                    location_combos.append((c, s))
+        elif countries:
+            for c in countries:
+                location_combos.append((c, None))
+        elif states:
+            for s in states:
+                location_combos.append((None, s))
+        location_combos = location_combos[:6]  # cap at 6 to prevent timeout
+
+        all_results = []
+        summary = []
+        for country, state in location_combos:
+            locs = []
+            if country:
+                locs.append(country)
+            if state and country:
+                locs.append(f"{state}, {country}")
+            elif state:
+                locs.append(state)
+
+            args = {"titles": titles_list, "limit": 15}
+            if locs:
+                args["locations"] = locs
+
+            os_result = _orange.call("ocean_search_people", args, timeout=45)
+            if "_error" in os_result:
+                summary.append({"country": country, "state": state, "category": "+".join(titles_list[:3]), "found": 0, "error": os_result["_error"][:100]})
+                continue
+
+            people = os_result.get("people", []) if isinstance(os_result, dict) else []
+            for idx_p, p in enumerate(people):
+                company_obj = p.get("company") or {}
+                company_name = company_obj.get("name") if isinstance(company_obj, dict) else ""
+                link = p.get("linkedinUrl") or ""
+                # Use linkedin URL as unique key
+                synth_id = "os_" + (link or p.get("name","") or str(idx_p)).replace("/", "_").replace(":","_")[:60]
+                all_results.append({
+                    "place_id":     synth_id,
+                    "name":         p.get("name") or f"{p.get('firstName','')} {p.get('lastName','')}".strip(),
+                    "email":        "",
+                    "phone":        "",
+                    "website":      link,
+                    "address":      p.get("location") or "",
+                    "category":     p.get("jobTitle") or p.get("headline") or "",
+                    "rating":       None,
+                    "reviews":      None,
+                    "source":       "orange_slice",
+                    "linkedinUrl":  link,
+                    "jobTitle":     p.get("jobTitle") or "",
+                    "headline":     p.get("headline") or "",
+                    "company":      company_name,
+                    "companyDomain":p.get("domain") or "",
+                    "firstName":    p.get("firstName") or "",
+                    "lastName":     p.get("lastName") or "",
+                    "country":      p.get("country","").upper(),
+                    "state":        p.get("state") or "",
+                })
+            summary.append({"country": country, "state": state, "category": "+".join(titles_list[:3]), "found": len(people)})
+
+        # Dedupe by linkedinUrl
+        seen = set(); unique = []
+        for r in all_results:
+            k = r.get("linkedinUrl") or r.get("place_id")
+            if k not in seen:
+                seen.add(k); unique.append(r)
+
+        return jsonify({
+            "ok": True, "source": "orange_slice",
+            "found": len(unique), "combinations_run": len(location_combos),
+            "capped": len(location_combos) >= 6,
+            "results": unique, "summary": summary,
+            "note": "Orange Slice / LinkedIn search via Ocean.io. Location filtering is approximate."
+        })
+
+
     """Bulk search: multiple countries × states × categories × job titles in one batch."""
     data = request.json or {}
     countries  = data.get("countries", [])
