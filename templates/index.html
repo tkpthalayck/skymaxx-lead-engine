@@ -1195,26 +1195,58 @@ function renderQSResults() {
     div.innerHTML = '<div class="empty"><i class="fas fa-search"></i><p>No results</p></div>';
     updateQSCount(); return;
   }
-  div.innerHTML = qsResults.map(r => {
-    const isSel = qsSelected.has(r.place_id);
-    const sel = isSel ? 'selected' : '';
-    const already = r.already_saved ? 'already' : '';
-    const webShort = r.website ? r.website.replace(/^https?:\/\//,'').slice(0,30) : '';
+  div.innerHTML = qsResults.map((r, idx) => {
+    const isSel    = qsSelected.has(r.place_id);
+    const sel      = isSel ? 'selected' : '';
+    const already  = r.already_saved ? 'already' : '';
+    const webShort = r.website ? r.website.replace(/^https?:\/\//,'').slice(0,40) : '';
+    const isOS     = r.source === 'orange_slice';
+
+    // Build meta line — different fields for Orange Slice vs Google Maps
+    let metaHtml;
+    if (isOS) {
+      // Orange Slice / LinkedIn — show LinkedIn + Title + Company + Location
+      const emailBlock = r.email
+        ? '<span><i class="fas fa-envelope"></i><span style="color:#34d399">✓ ' + r.email + '</span> <span style="color:#34d399;font-size:9px">verified</span></span>'
+        : '<span><i class="fas fa-envelope-open" style="color:var(--muted)"></i><button class="btn btn-outline btn-xs" onclick="event.stopPropagation(); linkedinGetEmail(\'' + r.place_id + '\')" id="getemail-' + r.place_id + '" title="Get verified email via Orange Slice (uses credits)"><i class="fas fa-envelope"></i> Get Email</button></span>';
+      metaHtml =
+        emailBlock +
+        (r.jobTitle ? '<span><i class="fas fa-user-tie"></i>' + escapeHtml(r.jobTitle) + '</span>' : '') +
+        (r.company  ? '<span><i class="fas fa-building"></i>' + escapeHtml(r.company)  + '</span>' : '') +
+        (r.linkedinUrl ? '<span><a href="' + r.linkedinUrl + '" target="_blank" style="color:#0a66c2;text-decoration:none"><i class="fab fa-linkedin"></i> View Profile</a></span>' : '') +
+        (r.address ? '<span><i class="fas fa-map-marker-alt"></i>' + escapeHtml(String(r.address).slice(0,60)) + '</span>' : '');
+    } else {
+      // Google Maps — existing format
+      metaHtml =
+        (r.email_source === 'pending' ? '<span style="color:var(--muted)"><i class="fas fa-spinner fa-spin"></i> scraping...</span>' :
+         r.email_source === 'failed'  ? '<span style="color:var(--red)"><i class="fas fa-exclamation-triangle"></i>scrape failed</span>' :
+         r.email                       ? '<span><i class="fas fa-envelope"></i><span style="color:' + (r.email_source==='scraped'?'#34d399':'#fbbf24') + '">' + r.email + '</span>' + (r.email_source==='scraped'?' <span title="Real email found on website" style="color:#34d399;font-size:9px">✓ verified</span>':' <span title="Generated guess (info@domain)" style="color:#fbbf24;font-size:9px">⚠ guess</span>') + '</span>' :
+                                         '<span style="color:var(--red)"><i class="fas fa-envelope-open"></i>no email</span>') +
+        (r.phone   ? '<span><i class="fas fa-phone"></i>' + r.phone + '</span>' : '') +
+        (r.website ? '<span><i class="fas fa-globe"></i><a href="' + r.website + '" target="_blank" style="color:var(--accent2);text-decoration:none">' + webShort + '</a></span>' : '') +
+        (r.rating  ? '<span><i class="fas fa-star" style="color:#f59e0b"></i>' + r.rating + ' (' + r.reviews + ')</span>' : '') +
+        (r.address ? '<span><i class="fas fa-map-marker-alt"></i>' + escapeHtml(String(r.address).slice(0,60)) + '</span>' : '');
+    }
+
+    // Source badge
+    const srcBadge = isOS
+      ? '<span class="badge" style="background:#fb923c20;color:#fb923c;font-size:9px;margin-left:4px"><i class="fab fa-linkedin"></i> LinkedIn</span>'
+      : '<span class="badge" style="background:#3b82f620;color:#3b82f6;font-size:9px;margin-left:4px"><i class="fas fa-map-marked-alt"></i> Maps</span>';
+
+    // Right-side actions
+    const rightActions = isOS
+      ? (r.linkedinUrl ? '<a href="' + r.linkedinUrl + '" target="_blank" class="btn btn-outline btn-xs" title="Open LinkedIn"><i class="fab fa-linkedin"></i></a>' : '')
+      : (r.maps_url ? '<a href="' + r.maps_url + '" target="_blank" class="btn btn-outline btn-xs"><i class="fas fa-map"></i></a>' : '');
+
     return '<div class="search-result ' + sel + ' ' + already + '" id="qsr-' + r.place_id + '">' +
       '<input type="checkbox"' + (isSel?' checked':'') + (r.already_saved?' disabled':'') + ' onchange="qsToggle(\'' + r.place_id + '\', this)"/>' +
       '<div class="sr-info">' +
-        '<div class="name">' + escapeHtml(r.name) + '</div>' +
-        '<div class="meta">' +
-          (r.email_source === 'pending' ? '<span style="color:var(--muted)"><i class="fas fa-spinner fa-spin"></i> scraping...</span>' : r.email_source === 'failed' ? '<span style="color:var(--red)"><i class="fas fa-exclamation-triangle"></i>scrape failed</span>' : r.email ? '<span><i class="fas fa-envelope"></i><span style="color:' + (r.email_source==='scraped'?'#34d399':'#fbbf24') + '">' + r.email + '</span>' + (r.email_source==='scraped'?' <span title="Real email found on website" style="color:#34d399;font-size:9px">✓ verified</span>':' <span title="Generated guess (info@domain)" style="color:#fbbf24;font-size:9px">⚠ guess</span>') + '</span>' : '<span style="color:var(--red)"><i class="fas fa-envelope-open"></i>no email</span>') +
-          (r.phone ? '<span><i class="fas fa-phone"></i>' + r.phone + '</span>' : '') +
-          (r.website ? '<span><i class="fas fa-globe"></i><a href="' + r.website + '" target="_blank" style="color:var(--accent2);text-decoration:none">' + webShort + '</a></span>' : '') +
-          (r.rating ? '<span><i class="fas fa-star" style="color:#f59e0b"></i>' + r.rating + ' (' + r.reviews + ')</span>' : '') +
-          (r.address ? '<span><i class="fas fa-map-marker-alt"></i>' + escapeHtml(String(r.address).slice(0,60)) + '</span>' : '') +
-        '</div>' +
+        '<div class="name">' + escapeHtml(r.name || '') + srcBadge + '</div>' +
+        '<div class="meta">' + metaHtml + '</div>' +
       '</div>' +
       '<div class="sr-actions">' +
         (r.already_saved ? '<span class="badge badge-done">Already saved</span>' : '') +
-        (r.maps_url ? '<a href="' + r.maps_url + '" target="_blank" class="btn btn-outline btn-xs"><i class="fas fa-map"></i></a>' : '') +
+        rightActions +
       '</div>' +
     '</div>';
   }).join('');
@@ -1508,7 +1540,7 @@ async function quickSearchV2() {
 
   if (!country) { status.innerHTML = '<span style="color:#f59e0b">Please pick a country.</span>'; return; }
   if (source === 'orange_slice' && !title && !keyword) {
-    status.innerHTML = '<span style="color:#fb923c">For Orange Slice, please provide a Job Title or Keyword.</span>'; return;
+    status.innerHTML = '<span style="color:#fb923c">For Orange Slice / LinkedIn search, please provide a Job Title or Keyword.</span>'; return;
   }
   if (source === 'google_maps' && !cat && !keyword) {
     status.innerHTML = '<span style="color:#f59e0b">Please pick a category or enter a custom keyword.</span>'; return;
@@ -1518,7 +1550,7 @@ async function quickSearchV2() {
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching ' + (source === 'orange_slice' ? 'LinkedIn (Orange Slice)' : 'Google Maps') + '...';
   status.innerHTML = '';
 
-  // Get country name from select option
+  // Get country NAME (for Orange Slice it wants country name, GMaps uses code)
   const countrySelect = document.getElementById('qs-country');
   const countryName = countrySelect.options[countrySelect.selectedIndex]?.text?.replace(/\s*\([A-Z]{2}\)$/,'') || country;
 
@@ -1544,10 +1576,20 @@ async function quickSearchV2() {
       return;
     }
     const results = data.results || [];
-    window.qsLastResults = results;
-    window.qsLastSource = source;
-    renderQsResults(results, source);
-    status.innerHTML = '<span style="color:#34d399">Found ' + results.length + ' results from ' + (source === 'orange_slice' ? 'Orange Slice / LinkedIn' : 'Google Maps') + '</span>';
+
+    // For Orange Slice results, assign a synthetic place_id from LinkedIn URL
+    results.forEach((r, idx) => {
+      if (!r.place_id) {
+        r.place_id = 'os_' + idx + '_' + (r.linkedinUrl || r.email || r.name || idx).toString().replace(/[^a-zA-Z0-9]/g, '').slice(-40);
+      }
+      if (!r.source) r.source = source;
+    });
+
+    // Update global state (existing pattern)
+    qsResults = results;
+    qsSelected.clear();
+    renderQSResults();
+    status.innerHTML = '<span style="color:#34d399">Found ' + results.length + ' results from ' + (source === 'orange_slice' ? 'Orange Slice (LinkedIn)' : 'Google Maps') + '</span>';
   } catch(e) {
     status.innerHTML = '<span style="color:#ef4444">Network error: ' + e.message + '</span>';
   } finally {
@@ -2044,36 +2086,38 @@ function qsSourceChanged() {
   }
 }
 
-async function linkedinGetEmail(idx) {
-  const r = window.qsLastResults?.[idx];
-  if (!r || !r.linkedinUrl) { alert('No LinkedIn URL for this lead'); return; }
-  const btn = document.getElementById('qs-email-btn-' + idx);
+async function linkedinGetEmail(placeId) {
+  const r = qsResults?.find(x => x.place_id === placeId);
+  if (!r) { alert('Lead not found'); return; }
+  if (!r.linkedinUrl) { alert('No LinkedIn URL'); return; }
+
+  const btn = document.getElementById('getemail-' + placeId);
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fetching...'; }
+
   try {
     const resp = await fetch('/api/linkedin/enrich_contact', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         linkedinUrl: r.linkedinUrl,
-        firstName: r.firstName || '',
-        lastName:  r.lastName  || '',
-        company:   r.company   || '',
-        required:  ['email','work_email']
+        firstName:   r.firstName || '',
+        lastName:    r.lastName  || '',
+        company:     r.company   || '',
+        required:    ['email','work_email']
       })
     });
     const data = await resp.json();
     if (data.ok && (data.email || data.work_email)) {
       r.email = data.email || data.work_email;
-      // Update UI
-      const cell = document.getElementById('qs-email-cell-' + idx);
-      if (cell) cell.innerHTML = '<span style="color:#34d399">✓ ' + r.email + '</span>';
-      if (btn) btn.style.display = 'none';
+      r.email_source = 'scraped';
+      renderQSResults();  // re-render with new email
     } else {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-times"></i> Not found'; }
+      setTimeout(() => { if (btn) { btn.innerHTML = '<i class="fas fa-envelope"></i> Get Email'; }}, 2500);
     }
   } catch(e) {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-exclamation"></i> Error'; }
-    alert('Error: ' + e.message);
+    console.error('linkedinGetEmail error', e);
   }
 }
 
