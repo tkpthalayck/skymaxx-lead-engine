@@ -1,0 +1,11 @@
+=== Recent app logs ===
+Logs error: HTTP Error 400: Bad Request
+
+=== Endpoint timing tests ===
+--- GMaps quick: AE hotel ---
+  HTTP 200 in 8.3s
+  Body: {"found":1,"location_label":"AE","note":null,"query":"hotel in AE","results":[{"address":"120 S Los Angeles St, Los Angeles, CA 90012, USA","already_saved":false,"category":"hotel","city":"AE","country":"AE","email":"","email_source":"pending","has_email":false,"maps_url":"https://www.google.com/maps/place/?q=place_id:ChIJZShY9kjGwoARtS9cta2oHiI","name":"DoubleTree by Hilton Hotel Los Angeles Down
+
+--- Orange Slice quick: IT Manager UAE limit=3 ---
+  HTTP 200 in 2.7s
+  Body: {"count":50,"ok":true,"results":[{"address":"St Petersburg, Florida, United States","category":"CTO, co-founder","company":"PandaDoc","companyDomain":"pandadoc.com","country":"US","email":"","firstName":"Sergey","headline":"Founder & CTO at PandaDoc","jobTitle":"CTO, co-founder","lastName":"Barysiuk","linkedinUrl":"https://www.linkedin.com/in/siarheibarysiuk","name":"Sergey Barysiuk","phone":"","p
