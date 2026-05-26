@@ -835,6 +835,14 @@ threading.Thread(target=scheduler_loop, daemon=True).start()
 # ───────────────────────────────────────────────────────────────────────
 # Orange Slice MCP Client — LinkedIn lead search (1.15B profiles)
 # ───────────────────────────────────────────────────────────────────────
+
+# ───────────────────────────────────────────────────────────────────────
+# CREDIT SAFETY LOCK — set to True to block all credit-consuming Orange Slice calls
+# This protects against unexpected billing while we evaluate the service.
+# Set ORANGE_SLICE_CREDITS_LOCKED env var to "false" to re-enable.
+# ───────────────────────────────────────────────────────────────────────
+ORANGE_SLICE_CREDITS_LOCKED = os.getenv("ORANGE_SLICE_CREDITS_LOCKED", "true").lower() != "false"
+
 class OrangeSliceClient:
     """JSON-RPC over SSE client for orangeslice.ai MCP server."""
     URL = "https://www.orangeslice.ai/mcp"
@@ -906,20 +914,37 @@ def index(): return render_template("index.html")
 
 @app.route("/api/stats")
 def stats():
-    conn = get_db()
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    """Dashboard stats — bulletproof, never raises 500."""
+    def _safe_count(sql, default=0):
+        try:
+            c = get_db()
+            try:
+                return c.execute(sql).fetchone()[0]
+            finally:
+                try: c.close()
+                except: pass
+        except Exception as e:
+            print(f"[stats] {sql[:50]}... → {type(e).__name__}: {e}")
+            return default
+
+    def _safe_call(fn, default=0):
+        try:
+            return fn()
+        except Exception as e:
+            print(f"[stats] {fn.__name__ if hasattr(fn,'__name__') else 'fn'} → {type(e).__name__}: {e}")
+            return default
+
     s = {
-        "total_leads":  conn.execute("SELECT COUNT(*) FROM leads").fetchone()[0],
-        "in_sequence":  conn.execute("SELECT COUNT(*) FROM leads WHERE in_sequence=1").fetchone()[0],
-        "with_email":   conn.execute("SELECT COUNT(*) FROM leads WHERE email IS NOT NULL AND email != ''").fetchone()[0],
-        "replied":      conn.execute("SELECT COUNT(*) FROM leads WHERE replied=1").fetchone()[0],
-        "today_sent":   get_todays_send_count(),
-        "daily_limit":  DAILY_SEND_LIMIT,
-        "bcc_support":  BCC_SUPPORT,
-        "total_sent":   conn.execute("SELECT COUNT(*) FROM email_log WHERE status='success'").fetchone()[0],
-        "total_failed": conn.execute("SELECT COUNT(*) FROM email_log WHERE status='failed'").fetchone()[0],
+        "total_leads":   _safe_count("SELECT COUNT(*) FROM leads"),
+        "in_sequence":   _safe_count("SELECT COUNT(*) FROM leads WHERE in_sequence=1"),
+        "with_email":    _safe_count("SELECT COUNT(*) FROM leads WHERE email IS NOT NULL AND email != ''"),
+        "replied":       _safe_count("SELECT COUNT(*) FROM leads WHERE replied=1"),
+        "today_sent":    _safe_call(get_todays_send_count) if "get_todays_send_count" in globals() else 0,
+        "daily_limit":   DAILY_SEND_LIMIT if "DAILY_SEND_LIMIT" in globals() else 300,
+        "bcc_support":   BCC_SUPPORT if "BCC_SUPPORT" in globals() else True,
+        "total_sent":    _safe_count("SELECT COUNT(*) FROM email_log WHERE status='success'"),
+        "total_failed":  _safe_count("SELECT COUNT(*) FROM email_log WHERE status='failed'"),
     }
-    conn.close()
     return jsonify(s)
 
 @app.route("/api/cities")
@@ -2924,6 +2949,14 @@ def config_check():
 
 @app.route("/api/linkedin/enrich_contact", methods=["POST"])
 def linkedin_enrich_contact():
+    if ORANGE_SLICE_CREDITS_LOCKED:
+        return jsonify({
+            "error": "Orange Slice credit usage is currently locked by the administrator. "
+                     "Email enrichment is disabled to prevent unexpected charges. "
+                     "Set ORANGE_SLICE_CREDITS_LOCKED=false in environment to re-enable.",
+            "locked": True
+        }), 423  # 423 Locked
+
     """Get verified email/phone for a LinkedIn profile via Orange Slice. Consumes credits."""
     if not _orange.is_configured():
         return jsonify({"error": "ORANGESLICE_API_KEY not configured"}), 400
@@ -2969,6 +3002,7 @@ def linkedin_enrich_contact():
 def linkedin_status():
     """Quick health check for Orange Slice integration."""
     return jsonify({
+        "credits_locked": ORANGE_SLICE_CREDITS_LOCKED,
         "configured": _orange.is_configured(),
         "key_prefix": _orange.api_key[:8] + "..." if _orange.api_key else None,
     })
