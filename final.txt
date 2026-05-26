@@ -1,0 +1,7 @@
+=== Static file final check ===
+  attempt 1: /static/logo.png → HTTP 200 | 19525 bytes | image/png | 0.21s
+  attempt 1: /static/favicon.png → HTTP 200 | 12937 bytes | image/png | 0.10s
+
+=== Loading dashboard page ===
+  Dashboard page: HTTP 200 | 117609 bytes | 0.13s
+  Logo referenced as: src="/static/logo.png"
