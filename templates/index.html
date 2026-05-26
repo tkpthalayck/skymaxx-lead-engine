@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" type="image/png" href="/static/favicon.png">
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SKYMAXX Lead Engine v3</title>
@@ -262,9 +263,9 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
 <body>
 
 <aside class="sidebar">
-  <div class="logo">
-    <h1>⚡ SKYMAXX</h1>
-    <span>Lead Engine v3.0</span>
+  <div class="logo" onclick="goHome()" style="cursor:pointer;text-align:center;padding-bottom:12px" title="Go to Dashboard">
+    <img src="/static/logo.png" alt="SKYMAXX Technologies" style="width:140px;height:140px;display:block;margin:0 auto;transition:transform .2s" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'"/>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;letter-spacing:.5px">Lead Engine v3.0</div>
   </div>
 
   <div class="nav-section">
@@ -2146,6 +2147,19 @@ function bulkSourceChanged() {
     hint.textContent = 'Searches Google Maps across all selected combinations. Best for local SMB outreach.';
     hint.style.color = '';
   }
+}
+
+
+function goHome() {
+  // Activate the Dashboard nav item + show its tab panel
+  const dashNav = document.querySelector('.nav-item[onclick*="dashboard"]');
+  if (dashNav) {
+    tab('dashboard', dashNav);
+  } else if (typeof tab === 'function') {
+    tab('dashboard');
+  }
+  // Scroll to top
+  window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 </script>
