@@ -1,88 +1,96 @@
 ============================================================
-LEAD SEARCHER AGENT — FULL APP AUDIT
+FULL ENDPOINT AUDIT — what data is loading?
 ============================================================
 
-TEST 1: Countries endpoint
-  HTTP 200 | Total countries: 65
-  GCC (6): AE:United Arab Emirates, SA:Saudi Arabia, QA:Qatar, KW:Kuwait, OM:Oman, BH:Bahrain
-  MENA (9): EG:Egypt, JO:Jordan, LB:Lebanon, TR:Turkey, MA:Morocco, TN:Tunisia, DZ:Algeria, IQ:Iraq...
-  Asia (16): IN:India, PK:Pakistan, BD:Bangladesh, LK:Sri Lanka, NP:Nepal, SG:Singapore, MY:Malaysia, ID:Indonesia...
-  Americas (7): US:United States, CA:Canada, MX:Mexico, BR:Brazil, AR:Argentina, CL:Chile, CO:Colombia
-  Europe (20): GB:United Kingdom, IE:Ireland, DE:Germany, FR:France, IT:Italy, ES:Spain, PT:Portugal, NL:Netherlands...
-  Oceania (2): AU:Australia, NZ:New Zealand
-  Africa (5): ZA:South Africa, NG:Nigeria, KE:Kenya, GH:Ghana, ET:Ethiopia
+  [FAIL] HTTP 500 | 0.00s | Dashboard stats           | /api/stats
+           <!doctype html>
+<html lang=en>
+<title>500 Internal Server Error</title>
+<h1>Internal Server Error</h1>
+<p>The server encountered an internal error and was unable to complete your request. Either the s
 
-  Critical countries check:
-    US: YES
-    AE: YES
-    CA: YES
-    GB: YES
-    DE: YES
-    AU: YES
-    JP: YES
-    MX: YES
-    BR: YES
-    IT: YES
-    ES: YES
-    NL: YES
+  [OK  ] HTTP 200 | 0.17s | All Leads                 | /api/leads?per_page=5
+           {"leads":[{"address":"St Petersburg, Florida, United States","campaign_id":null,"category":"CTO, co-founder","city":"","company":null,"country":"US","created_at":"Tue, 26 May 2026 02:47:32 GMT","email
 
-TEST 2: US states endpoint
-  HTTP 200 | Total US states: 51
-  Wyoming present: YES ✓
-  All 50 states: YES ✓
-  Has DC: YES
+  [FAIL] HTTP 404 | 0.00s | Sent emails               | /api/sent_log?limit=5
+           <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
 
-TEST 3: Other countries — state coverage
-  CA: 13 regions, e.g. Ontario, Quebec, British Columbia, Alberta
-  GB: 20 regions, e.g. London, Manchester, Birmingham, Leeds
-  DE: 15 regions, e.g. Berlin, Hamburg, Munich, Cologne
-  AU: 14 regions, e.g. Sydney (NSW), Melbourne (VIC), Brisbane (QLD), Perth (WA)
-  IN: 27 regions, e.g. Mumbai (Maharashtra), Delhi, Bangalore (Karnataka), Hyderabad (Telangana)
-  JP: 11 regions, e.g. Tokyo, Yokohama, Osaka, Nagoya
-  FR: 12 regions, e.g. Paris, Marseille, Lyon, Toulouse
-  BR: 14 regions, e.g. Sao Paulo, Rio de Janeiro, Brasilia, Salvador
+  [FAIL] HTTP 404 | 0.00s | Replies                   | /api/replies
+           <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
 
-TEST 4: Business categories
-  Total: 30
-    - Real Estate Agencies (kw: real estate agency)
-    - Hospitals (kw: hospital)
-    - Medical Clinics (kw: medical clinic)
-    - Dental Clinics (kw: dental clinic)
-    - Construction Companies (kw: construction company)
-    - Manufacturing Companies (kw: manufacturing company)
-    - Law Firms (kw: law firm)
-    - Accounting Firms (kw: accounting firm)
-    ...
+  [OK  ] HTTP 200 | 0.16s | Campaigns                 | /api/campaigns
+           {"campaigns":[{"actually_failed":0,"actually_replied":0,"actually_sent":0,"actually_started":0,"approved_at":"2026-05-26T03:07:34.969321","approved_by":"user","created_at":"Mon, 25 May 2026 13:22:04 G
 
-TEST 5: Job titles
-  Total: 22
-    - Founder (kw: founder)
-    - Co-Founder (kw: co-founder)
-    - CEO (kw: CEO)
-    - Managing Director (kw: managing director)
-    - Owner (kw: owner)
-    - President (kw: president)
-    - Partner (kw: partner)
-    - General Manager (kw: general manager)
-    ...
+  [OK  ] HTTP 200 | 0.16s | Contact Groups            | /api/groups
+           {"groups":[]}
 
-TEST 6: Cleanup duplicate leads
-  Before cleanup: 58 leads
-  Cleanup result: {"deleted": 58, "ok": true}
 
-TEST 7: Fresh import of 13 M365 leads
-  Import: {"imported":13}
+  [FAIL] HTTP 404 | 0.00s | Email Sequence            | /api/sequence
+           <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
 
-  After: 13 leads
-  - id=59 | Aaron Barak | Maxima Apparel
-  - id=60 | Chris Kucharski | OneRail
-  - id=61 | Hank Jackson | Edgewater Federal Solutions
-  - id=62 | James Stanford | Edgewater Federal Solutions
-  - id=63 | Raymond Churgovich | Edgewater Federal Solutions
+  [FAIL] HTTP 404 | 0.00s | Settings                  | /api/settings
+           <!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try agai
 
-TEST 8: Live lead search — IT companies in Wyoming, US
-  HTTP 200
-  Got 20 results
-    - Norms Technologies LLC | http://normstechnologies.com/
-    - Stellar Programming & Consulting, Inc. | http://www.stellarstar.com/
-    - Technologia Solutions | https://www.technologiasolutions.com/
+  [OK  ] HTTP 200 | 0.12s | Orange Slice config       | /api/linkedin/status
+           {"configured":true,"key_prefix":"osk_2eba..."}
+
+
+  [OK  ] HTTP 200 | 0.27s | Categories                | /api/business_categories
+           [{"id":"real_estate","keyword":"real estate agency","label":"Real Estate Agencies"},{"id":"hospitals","keyword":"hospital","label":"Hospitals"},{"id":"medical_clinics","keyword":"medical clinic","labe
+
+  [OK  ] HTTP 200 | 0.26s | Job titles                | /api/job_titles
+           [{"id":"founder","keyword":"founder","label":"Founder"},{"id":"cofounder","keyword":"co-founder","label":"Co-Founder"},{"id":"ceo","keyword":"CEO","label":"CEO"},{"id":"managing_director","keyword":"m
+
+  [OK  ] HTTP 200 | 0.12s | Countries                 | /api/locations/countries
+           [{"code":"AE","name":"United Arab Emirates","region":"GCC"},{"code":"SA","name":"Saudi Arabia","region":"GCC"},{"code":"QA","name":"Qatar","region":"GCC"},{"code":"KW","name":"Kuwait","region":"GCC"},
+
+  [OK  ] HTTP 200 | 0.12s | US states                 | /api/locations/states/US
+           ["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","District of Columbia","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","L
+
+  [OK  ] HTTP 200 | 0.12s | DB status                 | /api/debug/db
+           {"DATABASE_URL_prefix":"postgresql://skymaxx_user:lw6d","DATABASE_URL_set":true,"USE_POSTGRES":true,"db_query_works":true,"leads_count":14,"psycopg2_importable":true,"psycopg2_version":"2.9.10 (dt dec
+
+
+============================================================
+SUMMARY
+============================================================
+  ✗ 500 Dashboard stats           0.00s  /api/stats
+  ✓ 200 All Leads                 0.17s  /api/leads?per_page=5
+  ✗ 404 Sent emails               0.00s  /api/sent_log?limit=5
+  ✗ 404 Replies                   0.00s  /api/replies
+  ✓ 200 Campaigns                 0.16s  /api/campaigns
+  ✓ 200 Contact Groups            0.16s  /api/groups
+  ✗ 404 Email Sequence            0.00s  /api/sequence
+  ✗ 404 Settings                  0.00s  /api/settings
+  ✓ 200 Orange Slice config       0.12s  /api/linkedin/status
+  ✓ 200 Categories                0.27s  /api/business_categories
+  ✓ 200 Job titles                0.26s  /api/job_titles
+  ✓ 200 Countries                 0.12s  /api/locations/countries
+  ✓ 200 US states                 0.12s  /api/locations/states/US
+  ✓ 200 DB status                 0.12s  /api/debug/db
+
+============================================================
+FRONTEND INIT FLOW CHECK
+============================================================
+  'loadStats': YES — context:   renderSequenceOverview();   loadStats();   loadLeads(1);   loadQueue();   loadConfig();   setInterval(loadSt
+  'init1': MISSING from served HTML!
+  'init2': YES — context: ────────────────────────── // init2 — populate quick search city/preset dropdowns (legacy helper) // ─────────
+  'DOMContentLoaded': MISSING from served HTML!
+  'loadLeads': YES — context: , email, website..." oninput="loadLeads(1)"/>           <select id="f-seq" onchange="loadLeads(1)">           
+  'loadCampaigns': YES — context: line btn-sm ml-auto" onclick="loadCampaigns()"><i class="fas fa-sync"></i> Refresh</button></div>         <div
