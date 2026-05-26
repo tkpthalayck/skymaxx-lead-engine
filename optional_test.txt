@@ -1,0 +1,43 @@
+============================================================
+CATEGORY-OPTIONAL VERIFICATION
+============================================================
+
+=== TEST 1: Quick Search Wyoming, no category, no keyword ===
+  HTTP 400 in 0.0s
+  search_all_categories: None
+  Results found: 0
+
+=== TEST 2: Regression — Quick Search WITH category (Wyoming IT) ===
+  HTTP 502 in 0.0s
+  <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>502</title>
+    <style>@font-face {
+  font-fami
+
+=== TEST 3: Bulk Search — no categories selected ===
+  HTTP 200 in 6.6s
+  expanded_all_categories: True
+  Results: 151
+  Combinations run: 20
+    - [UNEC] United Engineering Cons | construction company | Al Barsha South Third - Al Bar
+    - Al Naboodah Construction Group | construction company | MAKANI - 47409 83835 - E-44 Ra
+    - Advanced Builders & Contractor | construction company | 10880 Wilshire Blvd Suite 1101
+
+=== TEST 4: Regression — Bulk Search WITH categories ===
+  HTTP 200 in 1.0s
+  expanded_all_categories: False
+  Results: 9
+
+=== TEST 5: Frontend UI changes ===
+  QS validation softened             : ✓
+  Bulk validation softened           : ✓
+  Category labeled optional          : ✓
+  Logo present                       : ✓
+  Credit lock UI                     : ✓
+
+=== TEST 6: Dashboard stats still working ===
+  Total leads: 14 | With email: 14 | Sent: 0
