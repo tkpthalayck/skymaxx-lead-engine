@@ -831,6 +831,76 @@ threading.Thread(target=scheduler_loop, daemon=True).start()
 # ─────────────────────────────────────────────
 # ROUTES
 # ─────────────────────────────────────────────
+
+# ───────────────────────────────────────────────────────────────────────
+# Orange Slice MCP Client — LinkedIn lead search (1.15B profiles)
+# ───────────────────────────────────────────────────────────────────────
+class OrangeSliceClient:
+    """JSON-RPC over SSE client for orangeslice.ai MCP server."""
+    URL = "https://www.orangeslice.ai/mcp"
+
+    def __init__(self):
+        self.api_key = os.getenv("ORANGESLICE_API_KEY", "").strip()
+
+    def is_configured(self):
+        return bool(self.api_key)
+
+    def call(self, tool_name, args, timeout=60):
+        """Call an Orange Slice MCP tool. Returns parsed result or {"_error": str}."""
+        if not self.api_key:
+            return {"_error": "ORANGESLICE_API_KEY not set"}
+        payload = {
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": tool_name, "arguments": args},
+        }
+        import urllib.request as _ur, urllib.error as _ue
+        req = _ur.Request(self.URL,
+            data=json.dumps(payload).encode(),
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream",
+            },
+            method="POST")
+        try:
+            r = _ur.urlopen(req, timeout=timeout)
+            body = r.read().decode()
+        except _ue.HTTPError as e:
+            return {"_error": f"HTTP {e.code}: {e.read().decode()[:300]}"}
+        except Exception as e:
+            return {"_error": str(e)[:300]}
+
+        # Parse SSE format: lines like "event: message" and "data: {json}"
+        parsed = None
+        for line in body.split("\n"):
+            if line.startswith("data: "):
+                try:
+                    parsed = json.loads(line[6:])
+                    break
+                except Exception:
+                    pass
+        if parsed is None:
+            try:
+                parsed = json.loads(body)
+            except Exception:
+                return {"_error": "Could not parse response", "_body": body[:400]}
+
+        if "error" in parsed:
+            return {"_error": json.dumps(parsed["error"])[:400]}
+
+        # Extract content text — Orange Slice returns result.content[].text as JSON string
+        content = parsed.get("result", {}).get("content", [])
+        for c in content:
+            if c.get("type") == "text":
+                try:
+                    return json.loads(c.get("text", "{}"))
+                except Exception:
+                    return {"_raw": c.get("text", "")}
+        return parsed.get("result", {})
+
+
+_orange = OrangeSliceClient()
+
 @app.route("/")
 def index(): return render_template("index.html")
 
@@ -2228,6 +2298,80 @@ def _build_search_query(category, job_title, country, state, city):
 # ─────────────────────────────────────────────
 @app.route("/api/search/v2/preview", methods=["POST"])
 def search_v2_preview():
+    # NEW: Route to Orange Slice (LinkedIn) if source is set
+    _data = request.get_json(silent=True) or {}
+    _source = (_data.get("source") or request.args.get("source") or "google_maps").strip().lower()
+    if _source == "orange_slice":
+        if not _orange.is_configured():
+            return jsonify({"error": "ORANGESLICE_API_KEY not configured on server"}), 400
+        # Build ocean_search_people args
+        titles_raw = (_data.get("title") or _data.get("keyword") or "").strip()
+        country    = (_data.get("country") or "").strip()
+        state      = (_data.get("state") or "").strip()
+        city       = (_data.get("city") or "").strip()
+        limit      = min(int(_data.get("limit") or 25), 50)
+
+        titles_list = []
+        if titles_raw:
+            # Split by comma if user entered multiple
+            titles_list = [t.strip() for t in titles_raw.split(",") if t.strip()]
+        if not titles_list:
+            return jsonify({"error": "Job title or keyword required for LinkedIn search"}), 400
+
+        # Build location list (Ocean uses country name primarily)
+        locations = []
+        if country:
+            locations.append(country)
+        if state and country:
+            locations.append(f"{state}, {country}")
+        if city and country:
+            locations.append(f"{city}, {country}")
+
+        args = {"titles": titles_list, "limit": limit}
+        if locations:
+            args["locations"] = locations
+
+        os_result = _orange.call("ocean_search_people", args, timeout=60)
+        if "_error" in os_result:
+            return jsonify({"error": os_result["_error"], "source": "orange_slice"}), 502
+
+        # Normalize to same shape as Google Maps results
+        people = os_result.get("people", []) if isinstance(os_result, dict) else []
+        results = []
+        for p in people:
+            # Build a normalized result dict
+            company_obj = p.get("company") or {}
+            company_name = company_obj.get("name") if isinstance(company_obj, dict) else ""
+            results.append({
+                "name":       p.get("name") or f"{p.get('firstName','')} {p.get('lastName','')}".strip(),
+                "email":      "",  # No email at this stage — requires enrichment
+                "phone":      "",
+                "website":    p.get("linkedinUrl") or "",
+                "address":    p.get("location") or "",
+                "category":   p.get("jobTitle") or p.get("headline") or "",
+                "rating":     None,
+                "reviews":    None,
+                "source":     "orange_slice",
+                # Orange Slice extras
+                "linkedinUrl":   p.get("linkedinUrl") or "",
+                "jobTitle":      p.get("jobTitle") or "",
+                "headline":      p.get("headline") or "",
+                "company":       company_name,
+                "companyDomain": p.get("domain") or "",
+                "firstName":     p.get("firstName") or "",
+                "lastName":      p.get("lastName") or "",
+                "photo":         p.get("photo") or "",
+                "country":       p.get("country","").upper(),
+                "state":         p.get("state") or "",
+            })
+        return jsonify({
+            "ok": True,
+            "source": "orange_slice",
+            "count": len(results),
+            "results": results,
+        })
+
+
     """New search with full hierarchical filters: country, state, city, category, job title."""
     data = request.json or {}
     category   = (data.get("category")   or "").strip()
@@ -2678,6 +2822,60 @@ def config_check():
         "graph_api":    bool(AZURE_TENANT_ID and AZURE_CLIENT_ID and AZURE_CLIENT_SECRET),
         "mailbox":      MAILBOX_EMAIL,
     })
+
+
+
+@app.route("/api/linkedin/enrich_contact", methods=["POST"])
+def linkedin_enrich_contact():
+    """Get verified email/phone for a LinkedIn profile via Orange Slice. Consumes credits."""
+    if not _orange.is_configured():
+        return jsonify({"error": "ORANGESLICE_API_KEY not configured"}), 400
+    data = request.get_json(silent=True) or {}
+    linkedin_url = (data.get("linkedinUrl") or "").strip()
+    first_name   = (data.get("firstName") or "").strip()
+    last_name    = (data.get("lastName") or "").strip()
+    company      = (data.get("company") or "").strip()
+    required     = data.get("required") or ["email"]
+
+    if not linkedin_url and not (first_name and last_name and company):
+        return jsonify({"error": "Need linkedinUrl OR (firstName + lastName + company)"}), 400
+
+    args = {"required": required}
+    if linkedin_url:
+        args["linkedinUrl"] = linkedin_url
+    if first_name:
+        args["firstName"] = first_name
+    if last_name:
+        args["lastName"] = last_name
+    if company:
+        args["company"] = company
+
+    result = _orange.call("person_contact_get", args, timeout=90)
+    if "_error" in result:
+        return jsonify({"error": result["_error"]}), 502
+
+    # Extract email/phone from response
+    email      = result.get("email") or result.get("work_email") or ""
+    work_email = result.get("work_email") or ""
+    phone      = result.get("phone") or ""
+
+    return jsonify({
+        "ok": True,
+        "email": email,
+        "work_email": work_email,
+        "phone": phone,
+        "raw": result,
+    })
+
+
+@app.route("/api/linkedin/status")
+def linkedin_status():
+    """Quick health check for Orange Slice integration."""
+    return jsonify({
+        "configured": _orange.is_configured(),
+        "key_prefix": _orange.api_key[:8] + "..." if _orange.api_key else None,
+    })
+
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
