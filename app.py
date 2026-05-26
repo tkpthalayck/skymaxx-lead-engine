@@ -2410,9 +2410,12 @@ def search_v2_preview():
         return jsonify({"error": "Google Maps not configured"}), 400
 
     # Build keyword: prefer custom keyword if provided, otherwise use category
+    # If neither set, fallback to generic "company" search — returns broad business mix
     keyword = custom_kw if custom_kw else category
+    search_all_categories = False
     if not keyword:
-        return jsonify({"error": "Please pick a Business Category or enter a custom keyword"}), 400
+        keyword = "company"
+        search_all_categories = True
     if not (country or state or city):
         return jsonify({"error": "Please pick a Country, State, or City"}), 400
 
@@ -2472,6 +2475,7 @@ def search_v2_preview():
             r["already_saved"] = r["place_id"] in existing
 
     return jsonify({
+        "search_all_categories": search_all_categories,
         "results": results,
         "found":   len(results),
         "query":   query,
@@ -2624,8 +2628,11 @@ def search_v2_bulk_preview():
     titles     = data.get("job_titles", [])  # keyword strings, not IDs
     if not GOOGLE_MAPS_API_KEY:
         return jsonify({"error": "Google Maps not configured"}), 400
+    # If no categories selected, search ALL categories (top 20 most diverse)
+    expanded_all = False
     if not categories:
-        return jsonify({"error": "Pick at least 1 business category"}), 400
+        categories = [c["keyword"] for c in BUSINESS_CATEGORIES[:20]]
+        expanded_all = True
     if not (countries or states):
         return jsonify({"error": "Pick at least 1 country or state"}), 400
 
@@ -2649,9 +2656,9 @@ def search_v2_bulk_preview():
                     "country":   country,
                     "state":     state,
                 })
-    # Cap at 12 to avoid timeouts (12 × 10 results = 120 leads)
-    if len(combinations) > 12:
-        combinations = combinations[:12]
+    # Cap at 24 (parallel execution: ~5s with 8 workers, plenty of headroom under 30s)
+    if len(combinations) > 24:
+        combinations = combinations[:24]
         capped = True
     else:
         capped = False
@@ -2660,26 +2667,35 @@ def search_v2_bulk_preview():
     summary = []
     seen_pids = set()
 
-    for combo in combinations:
-        query = _build_search_query(combo["category"], combo["job_title"],
-                                    combo["country"], combo["state"], "")
+    # Parallel search via ThreadPoolExecutor — keeps total time under Render's 30s timeout
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _do_one_search(combo):
+        q = _build_search_query(combo["category"], combo["job_title"],
+                                combo["country"], combo["state"], "")
         try:
             resp = requests.get(PLACES_TEXT_URL, params={
-                "key": GOOGLE_MAPS_API_KEY, "query": query
+                "key": GOOGLE_MAPS_API_KEY, "query": q
             }, timeout=15).json()
             if resp.get("status") not in ("OK", "ZERO_RESULTS"):
-                summary.append({**combo, "found": 0, "error": resp.get("status")})
+                return (combo, [], resp.get("status"))
+            return (combo, resp.get("results", [])[:8], None)
+        except Exception as e:
+            return (combo, [], str(e)[:100])
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(_do_one_search, c) for c in combinations]
+        for fut in as_completed(futures):
+            combo, places, err = fut.result()
+            if err:
+                summary.append({**combo, "found": 0, "error": err})
                 continue
-            places = resp.get("results", [])[:8]
             local_count = 0
             for place in places:
                 pid = place.get("place_id", "")
-                if pid in seen_pids: continue
+                if not pid or pid in seen_pids:
+                    continue
                 seen_pids.add(pid)
-                # Quick detail (skip on bulk for speed)
-                website = ""
-                email = ""
-                # Cheap fields directly from the search response
                 all_results.append({
                     "place_id":  pid,
                     "name":      place.get("name", ""),
@@ -2693,28 +2709,15 @@ def search_v2_bulk_preview():
                     "job_title": combo["job_title"],
                     "rating":    place.get("rating", 0),
                     "reviews":   place.get("user_ratings_total", 0),
-                    "maps_url":  f"https://www.google.com/maps/place/?q=place_id:{pid}",
+                    "maps_url":  "https://www.google.com/maps/place/?q=place_id:" + pid,
                     "has_email": False,
                 })
                 local_count += 1
             summary.append({**combo, "found": local_count, "error": None})
-        except Exception as e:
-            summary.append({**combo, "found": 0, "error": str(e)[:80]})
-        time.sleep(0.2)
-
-    # Mark already saved
-    if all_results:
-        pids = [r["place_id"] for r in all_results]
-        conn = get_db()
-        placeholders = ",".join("?" * len(pids))
-        existing = {r["place_id"] for r in conn.execute(
-            f"SELECT place_id FROM leads WHERE place_id IN ({placeholders})", pids).fetchall()}
-        conn.close()
-        for r in all_results:
-            r["already_saved"] = r["place_id"] in existing
 
     return jsonify({
-        "results":    all_results,
+        "expanded_all_categories": expanded_all,
+        "results": all_results,
         "found":      len(all_results),
         "summary":    summary,
         "capped":     capped,
