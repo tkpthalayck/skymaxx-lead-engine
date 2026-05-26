@@ -1,0 +1,16 @@
+name: FinalCheck
+on: { workflow_dispatch: , push: { paths: ['final_check.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 final_check.py
+      - if: always()
+        run: |
+          git config user.email "b@s.c"
+          git config user.name "B"
+          git add -f final.txt 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "f [skip ci]"
+          git push || true
