@@ -1,0 +1,47 @@
+============================================================
+POST-FIX VERIFICATION
+============================================================
+
+=== /api/stats — should NOT 500/timeout anymore ===
+  HTTP 200 in 0.80s
+    bcc_support     = True
+    daily_limit     = 300
+    in_sequence     = 0
+    replied         = 0
+    today_sent      = 0
+    total_failed    = 0
+    total_leads     = 14
+    total_sent      = 0
+    with_email      = 14
+
+=== Logo + HTML deploy ===
+  /static/logo.png:    HTTP 0
+  /static/favicon.png: HTTP 0
+  /static/logo.png in HTML           : ✓
+  goHome function in HTML            : ✓
+  favicon link in HTML               : ✓
+  Old ⚡ SKYMAXX removed              : ✓
+  loadStats has timeout              : ✓
+  Credit lock warning present        : ✓
+  Get Email button disabled          : ✓
+
+=== Orange Slice credits locked ===
+  /api/linkedin/status: HTTP 200 | {"configured":true,"credits_locked":true,"key_prefix":"osk_2eba..."}
+
+  enrich_contact attempt: HTTP 423
+    Body: {"error":"Orange Slice credit usage is currently locked by the administrator. Email enrichment is disabled to prevent unexpected charges. Set ORANGE_SLICE_CREDITS_LOCKED=false in environment to re-enable.","locked":true}
+
+
+=== Other dashboard endpoints ===
+  HTTP 200 in 0.13s | /api/leads?per_page=3
+  HTTP 200 in 0.09s | /api/log
+  HTTP 200 in 0.24s | /api/config
+  HTTP 200 in 0.09s | /api/sequence/queue
+  HTTP 200 in 0.09s | /api/campaigns
+  HTTP 200 in 0.11s | /api/groups
+
+=== Orange Slice SEARCH (free) — should still work ===
+  HTTP 200 in 3.81s
+    Count: 50
+      - Sergey Barysiuk | CTO, co-founder
+      - Keith Rabkin | Chief Executive Officer
