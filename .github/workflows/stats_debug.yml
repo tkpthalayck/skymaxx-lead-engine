@@ -1,0 +1,17 @@
+name: StatsDebug
+on: { workflow_dispatch: , push: { paths: ['stats_debug.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 stats_debug.py
+      - if: always()
+        run: |
+          git config user.email "b@s.c"
+          git config user.name "B"
+          git add -f stats_debug.txt 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "stats dbg [skip ci]"
+          git push || true
