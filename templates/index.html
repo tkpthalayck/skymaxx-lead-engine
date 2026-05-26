@@ -465,6 +465,18 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
             <div class="chip-grid" id="bulk-titles" style="max-height:140px"></div>
           </div>
 
+          <div class="form-row" id="bulk-source-row" style="margin-bottom:8px">
+            <div class="form-group" style="flex:1">
+              <label><i class="fas fa-database"></i> Data Source</label>
+              <select id="bulk-source" onchange="bulkSourceChanged()">
+                <option value="google_maps">🗺️ Google Maps — Local Businesses (default)</option>
+                <option value="orange_slice">🔶 Orange Slice — LinkedIn Profiles (1.15B people)</option>
+              </select>
+              <div id="bulk-source-hint" style="font-size:.78em;opacity:.7;margin-top:4px">
+                Searches Google Maps across all selected combinations. Best for local SMB outreach.
+              </div>
+            </div>
+          </div>
           <div class="alert alert-warn mt-3" id="bulk-summary" style="display:none">
             <i class="fas fa-info-circle"></i>
             <div><strong><span id="bs-combos">0</span> combinations</strong>
@@ -1603,7 +1615,9 @@ async function bulkSearchV2() {
   const states     = Array.from(bulkSelected.states);
   const categories = Array.from(bulkSelected.categories);
   const titles     = Array.from(bulkSelected.titles);
-  if (!categories.length) { alert('Pick at least 1 Business Category'); return; }
+  const _src = document.getElementById('bulk-source')?.value || 'google_maps';
+  if (_src === 'orange_slice' && !titles.length) { alert('For Orange Slice bulk search, pick at least 1 Job Title'); return; }
+  if (_src === 'google_maps'  && !categories.length) { alert('Pick at least 1 Business Category'); return; }
   if (!countries.length && !states.length) { alert('Pick at least 1 Country or State'); return; }
 
   const btn = document.getElementById('bulk-btn');
@@ -1613,7 +1627,7 @@ async function bulkSearchV2() {
   try {
     const r = await fetch('/api/search/v2/bulk_preview', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({countries, states, categories, job_titles:titles})
+      body: JSON.stringify({countries, states, categories, job_titles:titles, source: document.getElementById('bulk-source')?.value || 'google_maps'})
     }).then(r=>r.json());
     btn.disabled = false; btn.innerHTML = '<i class="fas fa-rocket"></i> Launch Bulk Search';
     if (r.error) {
@@ -2118,6 +2132,19 @@ async function linkedinGetEmail(placeId) {
   } catch(e) {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-exclamation"></i> Error'; }
     console.error('linkedinGetEmail error', e);
+  }
+}
+
+
+function bulkSourceChanged() {
+  const src = document.getElementById('bulk-source').value;
+  const hint = document.getElementById('bulk-source-hint');
+  if (src === 'orange_slice') {
+    hint.textContent = '🔶 Bulk LinkedIn search via Orange Slice/Ocean.io. Best when you have Job Titles selected. Runs 1 query per country/state combo (capped at 6).';
+    hint.style.color = '#fb923c';
+  } else {
+    hint.textContent = 'Searches Google Maps across all selected combinations. Best for local SMB outreach.';
+    hint.style.color = '';
   }
 }
 
