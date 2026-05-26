@@ -1,0 +1,21 @@
+=== Final Performance Tests ===
+
+--- Wyoming, NO category (the case that 502d before) ---
+  HTTP 200 in 5.2s
+  search_all_categories: True
+  Results: 15
+    - Wyoming Corporate Services | https://www.wyomingcompany.com/
+    - Wyoming Mining Company | http://wyomingmining.com/
+    - EZCorpServices / Wyoming EZ Corp &  | https://ezcorpservices.com/
+
+--- Wyoming WITH category IT (regression — speed test) ---
+  HTTP 200 in 6.2s
+  Results: 20
+
+--- UAE Dubai, NO category ---
+  HTTP 200 in 4.7s | Results: 
+    15 | all_cats: True
+
+--- Bulk Search no categories, UAE (regression) ---
+  HTTP 200 in 5.9s
+  expanded_all: True | Results: 149
