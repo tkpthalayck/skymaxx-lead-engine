@@ -1,0 +1,17 @@
+name: DebugRender
+on: { workflow_dispatch: , push: { paths: ['debug_render.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 debug_render.py
+      - if: always()
+        run: |
+          git config user.email "b@s.c"
+          git config user.name "B"
+          git add -f debug.txt 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "dbg [skip ci]"
+          git push || true
