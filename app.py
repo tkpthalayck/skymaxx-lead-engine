@@ -2432,17 +2432,28 @@ def search_v2_preview():
 
     location_label = ", ".join(p for p in [city, state, country] if p)
 
-    results = []
-    for place in resp.get("results", [])[:20]:
+    # Parallelize detail fetches with ThreadPoolExecutor — ~3x faster than sequential
+    from concurrent.futures import ThreadPoolExecutor
+    # In "search all" mode, fetch fewer detailed results to keep response fast (15 vs 20)
+    cap = 15 if search_all_categories else 20
+
+    def _fetch_detail(place):
         pid = place.get("place_id", "")
         try:
             det = requests.get(PLACES_DETAIL_URL, params={
                 "key": GOOGLE_MAPS_API_KEY, "place_id": pid,
                 "fields": "name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,types"
-            }, timeout=10).json().get("result", {})
+            }, timeout=8).json().get("result", {})
         except Exception:
             det = {}
-        time.sleep(0.3)
+        return (place, pid, det)
+
+    results = []
+    places_to_detail = resp.get("results", [])[:cap]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        details_list = list(pool.map(_fetch_detail, places_to_detail))
+
+    for place, pid, det in details_list:
         website = det.get("website", "") or ""
         # Pre-set has_email/email_source if no website (final state)
         # If website exists, frontend will enrich via /api/search/v2/enrich_emails
