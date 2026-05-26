@@ -397,7 +397,7 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
 
         <div class="form-row">
           <div class="form-group">
-            <label><i class="fas fa-briefcase"></i> Business Category</label>
+            <label><i class="fas fa-briefcase"></i> Business Category <span style="text-transform:none;font-weight:400;opacity:.6;font-size:.85em">(optional — leave empty to search all)</span></label>
             <select id="qs-category">
               <option value="">— Pick a category —</option>
             </select>
@@ -1576,8 +1576,9 @@ async function quickSearchV2() {
   if (source === 'orange_slice' && !title && !keyword) {
     status.innerHTML = '<span style="color:#fb923c">For Orange Slice / LinkedIn search, please provide a Job Title or Keyword.</span>'; return;
   }
+  // No category + no keyword is OK for Google Maps — backend searches "company" broadly
   if (source === 'google_maps' && !cat && !keyword) {
-    status.innerHTML = '<span style="color:#f59e0b">Please pick a category or enter a custom keyword.</span>'; return;
+    status.innerHTML = '<span style="color:#a78bfa"><i class="fas fa-info-circle"></i> No category/keyword — searching ALL businesses in this location.</span>';
   }
 
   btn.disabled = true;
@@ -1639,7 +1640,10 @@ async function bulkSearchV2() {
   const titles     = Array.from(bulkSelected.titles);
   const _src = document.getElementById('bulk-source')?.value || 'google_maps';
   if (_src === 'orange_slice' && !titles.length) { alert('For Orange Slice bulk search, pick at least 1 Job Title'); return; }
-  if (_src === 'google_maps'  && !categories.length) { alert('Pick at least 1 Business Category'); return; }
+  // For Google Maps, no categories = "search all" mode (backend expands to top 20 categories)
+  if (_src === 'google_maps' && !categories.length && !countries.length && !states.length) {
+    alert('Pick at least 1 Country, State, or Category — too broad otherwise!'); return;
+  }
   if (!countries.length && !states.length) { alert('Pick at least 1 Country or State'); return; }
 
   const btn = document.getElementById('bulk-btn');
