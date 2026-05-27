@@ -674,20 +674,50 @@ def rows_to_list(rows): return [dict(r) for r in rows]
 # ─────────────────────────────────────────────
 # EMAIL SENDING
 # ─────────────────────────────────────────────
+def _ensure_daily_send_count_table():
+    """Defensive: create daily_send_count table if it does not exist.
+    Works for both Postgres and SQLite."""
+    try:
+        conn = get_db()
+        if USE_POSTGRES if "USE_POSTGRES" in globals() else False:
+            conn.execute("""CREATE TABLE IF NOT EXISTS daily_send_count (
+                date TEXT PRIMARY KEY,
+                count INTEGER DEFAULT 0
+            )""")
+        else:
+            conn.execute("""CREATE TABLE IF NOT EXISTS daily_send_count (
+                date TEXT PRIMARY KEY,
+                count INTEGER DEFAULT 0
+            )""")
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[ensure_daily_send_count] {type(e).__name__}: {e}")
+
+
 def get_todays_send_count():
-    conn = get_db()
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    row = conn.execute("SELECT count FROM daily_send_count WHERE date=?", [today]).fetchone()
-    conn.close()
-    return row["count"] if row else 0
+    _ensure_daily_send_count_table()
+    try:
+        conn = get_db()
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        row = conn.execute("SELECT count FROM daily_send_count WHERE date=?", [today]).fetchone()
+        conn.close()
+        return row["count"] if row else 0
+    except Exception as e:
+        print(f"[get_todays_send_count] {type(e).__name__}: {e}")
+        return 0
 
 def increment_send_count():
-    conn = get_db()
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    conn.execute("INSERT INTO daily_send_count (date, count) VALUES (?, 1) "
-                 "ON CONFLICT(date) DO UPDATE SET count = count + 1", [today])
-    conn.commit()
-    conn.close()
+    _ensure_daily_send_count_table()
+    try:
+        conn = get_db()
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        conn.execute("INSERT INTO daily_send_count (date, count) VALUES (?, 1) "
+                     "ON CONFLICT(date) DO UPDATE SET count = count + 1", [today])
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[increment_send_count] {type(e).__name__}: {e}")
 
 def personalize(text, lead):
     full_name = (lead.get("name") or "").strip()
@@ -1003,6 +1033,91 @@ def debug_test_zepto():
         return jsonify({"ok": ok, "error": err or None, "to": to_email})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:300]}), 500
+
+
+
+
+@app.route("/api/debug/fix_campaign_leads/<int:cid>", methods=["POST"])
+def debug_fix_campaign_leads(cid):
+    """Replace this campaign's stale lead_ids_json with current valid leads (with email).
+    Use this when the original lead IDs were deleted (e.g. after cleanup_dupes).
+    Optionally provide ?ids=72,73,74 in body to use specific IDs instead."""
+    conn = get_db()
+    camp = conn.execute("SELECT * FROM campaigns WHERE id=?", [cid]).fetchone()
+    if not camp:
+        conn.close()
+        return jsonify({"error": "campaign not found"}), 404
+
+    data = request.json or {}
+    specific_ids = data.get("lead_ids")  # optional
+
+    if specific_ids and isinstance(specific_ids, list):
+        try:
+            valid_ids = [int(x) for x in specific_ids]
+        except Exception:
+            conn.close()
+            return jsonify({"error": "lead_ids must be integers"}), 400
+    else:
+        # Default: all leads with email, not unsubscribed, not replied
+        rows = conn.execute("""SELECT id FROM leads
+            WHERE email IS NOT NULL AND email != ''
+              AND unsubscribed=0 AND replied=0
+            ORDER BY id""").fetchall()
+        valid_ids = [r["id"] for r in rows]
+
+    # Reset campaign state + replace IDs
+    conn.execute("""UPDATE campaigns
+        SET lead_ids_json=?, recipient_count=?, status='pending_approval',
+            approved_at=NULL, approved_by=NULL, actually_started=0
+        WHERE id=?""", [json.dumps(valid_ids), len(valid_ids), cid])
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "fixed":           True,
+        "campaign_id":     cid,
+        "new_lead_count":  len(valid_ids),
+        "new_lead_ids":    valid_ids[:30],
+        "next_step":       "POST /api/campaigns/" + str(cid) + "/approve to enroll these leads"
+    })
+
+
+@app.route("/api/debug/delete_campaign/<int:cid>", methods=["POST"])
+def debug_delete_campaign(cid):
+    """Delete a campaign + clear in_sequence on any leads currently linked to it."""
+    conn = get_db()
+    conn.execute("""UPDATE leads
+        SET in_sequence=0, sequence_step=0, next_send_at=NULL, campaign_id=NULL
+        WHERE campaign_id=?""", [cid])
+    conn.execute("DELETE FROM campaigns WHERE id=?", [cid])
+    conn.commit()
+    conn.close()
+    return jsonify({"deleted": True, "campaign_id": cid})
+
+
+@app.route("/api/debug/ensure_schema", methods=["POST", "GET"])
+def debug_ensure_schema():
+    """Run all CREATE TABLE IF NOT EXISTS statements + verify each table exists.
+    Use this if you suspect schema drift."""
+    results = {}
+    tables_to_check = ["leads", "campaigns", "email_log", "sequences",
+                       "daily_send_count", "tracking_events",
+                       "contact_groups", "lead_group_assignments"]
+
+    # Ensure daily_send_count (the known-missing one)
+    _ensure_daily_send_count_table()
+
+    # Verify each table exists
+    conn = get_db()
+    for tbl in tables_to_check:
+        try:
+            conn.execute(f"SELECT 1 FROM {tbl} LIMIT 1").fetchone()
+            results[tbl] = "ok"
+        except Exception as e:
+            results[tbl] = f"MISSING: {type(e).__name__}: {str(e)[:120]}"
+    conn.close()
+
+    return jsonify({"tables": results, "checked_at": datetime.utcnow().isoformat()})
 
 
 # Start scheduler thread
