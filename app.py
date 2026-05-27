@@ -884,6 +884,38 @@ def update_campaign_counters(campaign_id=None):
     conn.commit()
     conn.close()
 
+
+
+def _places_text_search_paginated(query, max_pages=3, max_results=60):
+    """Fetch Google Maps Text Search results across multiple pages.
+    Returns up to `max_results` combined results from up to `max_pages` pages.
+    Each page yields up to 20 results; token activation requires 2s delay."""
+    all_results = []
+    next_token = None
+    for page_num in range(max_pages):
+        if next_token:
+            params = {"key": GOOGLE_MAPS_API_KEY, "pagetoken": next_token}
+            time.sleep(2)  # Google requires ~2s for next_page_token to activate
+        else:
+            params = {"key": GOOGLE_MAPS_API_KEY, "query": query}
+        try:
+            resp = requests.get(PLACES_TEXT_URL, params=params, timeout=15).json()
+        except Exception as e:
+            print(f"[places_paginated] page {page_num+1}: {e}")
+            break
+        if resp.get("status") not in ("OK", "ZERO_RESULTS"):
+            print(f"[places_paginated] page {page_num+1} status={resp.get('status')}")
+            break
+        all_results.extend(resp.get("results", []))
+        if len(all_results) >= max_results:
+            all_results = all_results[:max_results]
+            break
+        next_token = resp.get("next_page_token")
+        if not next_token:
+            break
+    return all_results
+
+
 def process_pending_sends(max_per_run=None):
     today_count = get_todays_send_count()
     if today_count >= DAILY_SEND_LIMIT:
@@ -2876,21 +2908,22 @@ def search_v2_preview():
 
     query = _build_search_query(keyword, job_title, country, state, city)
 
+    # Paginated fetch: up to 60 results via 3-page sweep (Google Maps Text Search limit)
     try:
-        resp = requests.get(PLACES_TEXT_URL, params={
-            "key": GOOGLE_MAPS_API_KEY, "query": query
-        }, timeout=15).json()
+        places_raw = _places_text_search_paginated(query, max_pages=3, max_results=60)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    if resp.get("status") not in ("OK", "ZERO_RESULTS"):
-        return jsonify({"error": resp.get("error_message", resp.get("status"))}), 403
+    if not places_raw:
+        # No results found (treat as ZERO_RESULTS)
+        places_raw = []
+    resp = {"status": "OK", "results": places_raw}
 
     location_label = ", ".join(p for p in [city, state, country] if p)
 
     # Parallelize detail fetches with ThreadPoolExecutor — ~3x faster than sequential
     from concurrent.futures import ThreadPoolExecutor
     # In "search all" mode, fetch fewer detailed results to keep response fast (15 vs 20)
-    cap = 15 if search_all_categories else 20
+    cap = 30 if search_all_categories else 60  # up to 60 per single keyword via pagination
 
     def _fetch_detail(place):
         pid = place.get("place_id", "")
