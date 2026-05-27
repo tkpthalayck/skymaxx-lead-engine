@@ -799,6 +799,91 @@ def scheduler_loop():
             print(f"[scheduler] Error: {e}")
         time.sleep(60)
 
+
+
+def update_campaign_counters(campaign_id=None):
+    """Recompute actually_sent/failed/replied counters for a campaign (or all campaigns).
+    Also transitions status: approved → running (if any sends), → completed (if all leads done).
+    Skips campaigns in: paused, cancelled, draft, pending_approval."""
+    if campaign_id is None:
+        # Update all active campaigns
+        conn = get_db()
+        camps = conn.execute(
+            "SELECT id FROM campaigns WHERE status IN ('approved', 'running', 'scheduled')"
+        ).fetchall()
+        conn.close()
+        for c in camps:
+            update_campaign_counters(c["id"])
+        return
+
+    conn = get_db()
+    camp = conn.execute("SELECT * FROM campaigns WHERE id=?", [campaign_id]).fetchone()
+    if not camp:
+        conn.close()
+        return
+
+    try:
+        lead_ids = json.loads(camp["lead_ids_json"] or "[]")
+        lead_ids = [int(x) for x in lead_ids if x]
+    except Exception:
+        lead_ids = []
+
+    if not lead_ids:
+        conn.close()
+        return
+
+    placeholders = ",".join("?" * len(lead_ids))
+
+    # Count sends from email_log
+    sent_count = conn.execute(
+        f"SELECT COUNT(*) FROM email_log WHERE lead_id IN ({placeholders}) AND status='success'",
+        lead_ids).fetchone()[0]
+    failed_count = conn.execute(
+        f"SELECT COUNT(*) FROM email_log WHERE lead_id IN ({placeholders}) AND status='failed'",
+        lead_ids).fetchone()[0]
+
+    # Replied & lead state counts
+    replied_count = conn.execute(
+        f"SELECT COUNT(*) FROM leads WHERE id IN ({placeholders}) AND replied=1",
+        lead_ids).fetchone()[0]
+    in_seq_count = conn.execute(
+        f"SELECT COUNT(*) FROM leads WHERE id IN ({placeholders}) AND in_sequence=1",
+        lead_ids).fetchone()[0]
+    finished_seq = conn.execute(
+        f"SELECT COUNT(*) FROM leads WHERE id IN ({placeholders}) AND sequence_step >= 5",
+        lead_ids).fetchone()[0]
+    unsubscribed = conn.execute(
+        f"SELECT COUNT(*) FROM leads WHERE id IN ({placeholders}) AND unsubscribed=1",
+        lead_ids).fetchone()[0]
+
+    # Determine new status (do not override paused/cancelled/failed/scheduled)
+    current_status = camp["status"]
+    new_status = current_status
+    if current_status not in ("paused", "cancelled", "failed", "draft", "pending_approval"):
+        # Has any send happened?
+        any_activity = sent_count > 0 or failed_count > 0
+        # Are all leads done (replied, unsubscribed, finished sequence)?
+        done_count = replied_count + unsubscribed + finished_seq
+        # But avoid double counting — a lead can be both finished AND replied. Better:
+        terminal_leads = conn.execute(
+            f"""SELECT COUNT(*) FROM leads WHERE id IN ({placeholders})
+                AND (replied=1 OR unsubscribed=1 OR sequence_step >= 5)""",
+            lead_ids).fetchone()[0]
+
+        if terminal_leads >= len(lead_ids):
+            new_status = "completed"
+        elif any_activity:
+            new_status = "running"
+        # else: keep as 'approved' (just enrolled, no sends yet)
+
+    conn.execute(
+        """UPDATE campaigns
+           SET status=?, actually_sent=?, actually_failed=?, actually_replied=?
+           WHERE id=?""",
+        [new_status, sent_count, failed_count, replied_count, campaign_id])
+    conn.commit()
+    conn.close()
+
 def process_pending_sends(max_per_run=None):
     today_count = get_todays_send_count()
     if today_count >= DAILY_SEND_LIMIT:
@@ -839,6 +924,18 @@ def process_pending_sends(max_per_run=None):
         conn = get_db()
         conn.execute("UPDATE email_log SET status=?, error_msg=? WHERE id=?",
                      ["success" if ok else "failed", err or "", log_id])
+        # Update parent campaign counters + status
+        if lead.get("campaign_id"):
+            try:
+                conn.execute("""UPDATE campaigns SET
+                    actually_sent = actually_sent + ?,
+                    actually_failed = actually_failed + ?
+                    WHERE id = ?""", [1 if ok else 0, 0 if ok else 1, lead["campaign_id"]])
+                # Transition approved → running on first send
+                conn.execute("""UPDATE campaigns SET status='running'
+                    WHERE id=? AND status='approved'""", [lead["campaign_id"]])
+            except Exception as ce:
+                print(f"[counter] Campaign update err: {ce}")
         # Auto-update lead status
         if ok:
             conn.execute("UPDATE leads SET status='contacted' WHERE id=? AND status NOT IN ('replied','qualified','interested')",
@@ -918,6 +1015,14 @@ def cron_process():
             report["replies"]["processed"] = 1
     except Exception as e:
         report["replies"]["error"] = str(e)[:300]
+
+    # --- Update campaign counters + auto-transition statuses ---
+    try:
+        update_campaign_counters()
+        report["campaigns_updated"] = True
+    except Exception as e:
+        report["campaigns_updated"] = False
+        report["campaign_error"] = str(e)[:300]
 
     report["completed_at"] = datetime.utcnow().isoformat()
     return jsonify(report)
