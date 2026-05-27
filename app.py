@@ -825,6 +825,186 @@ def process_pending_sends():
         conn.close()
         time.sleep(2)  # rate-limit between sends
 
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# CRON ENDPOINT — call this every 5 min from an external cron service
+# (e.g. cron-job.com, UptimeRobot) to keep Render awake AND process sends
+# ═══════════════════════════════════════════════════════════════════════
+@app.route("/api/cron/process", methods=["GET", "POST"])
+def cron_process():
+    """External-cron-driven processor. Call from cron-job.com every 5 min.
+    Processes: (a) pending email sends, (b) inbox replies via Microsoft Graph."""
+    started = datetime.utcnow().isoformat()
+    report = {
+        "started_at":   started,
+        "completed_at": None,
+        "ok":           True,
+        "sends": {"before_pending": 0, "after_pending": 0, "sent_this_run": 0, "error": None},
+        "replies": {"processed": 0, "error": None},
+    }
+
+    # --- Process pending sends ---
+    try:
+        conn = get_db()
+        now_iso = datetime.utcnow().isoformat()
+        before_pending = conn.execute("""
+            SELECT COUNT(*) FROM leads
+            WHERE in_sequence=1 AND unsubscribed=0 AND replied=0
+              AND email IS NOT NULL AND email != ''
+              AND (next_send_at IS NULL OR next_send_at <= ?)
+              AND sequence_step < 5
+        """, [now_iso]).fetchone()[0]
+        before_sent = conn.execute("SELECT COUNT(*) FROM email_log WHERE status='success'").fetchone()[0]
+        conn.close()
+
+        report["sends"]["before_pending"] = before_pending
+        process_pending_sends()
+
+        conn = get_db()
+        after_pending = conn.execute("""
+            SELECT COUNT(*) FROM leads
+            WHERE in_sequence=1 AND unsubscribed=0 AND replied=0
+              AND email IS NOT NULL AND email != ''
+              AND (next_send_at IS NULL OR next_send_at <= ?)
+              AND sequence_step < 5
+        """, [datetime.utcnow().isoformat()]).fetchone()[0]
+        after_sent = conn.execute("SELECT COUNT(*) FROM email_log WHERE status='success'").fetchone()[0]
+        conn.close()
+
+        report["sends"]["after_pending"] = after_pending
+        report["sends"]["sent_this_run"] = after_sent - before_sent
+    except Exception as e:
+        report["sends"]["error"] = str(e)[:300]
+        report["ok"] = False
+
+    # --- Process replies (if Microsoft Graph configured) ---
+    try:
+        if "process_replies" in globals():
+            process_replies()
+            report["replies"]["processed"] = 1
+    except Exception as e:
+        report["replies"]["error"] = str(e)[:300]
+
+    report["completed_at"] = datetime.utcnow().isoformat()
+    return jsonify(report)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# DEBUG: Inspect campaign + leads state in one call
+# ═══════════════════════════════════════════════════════════════════════
+@app.route("/api/debug/campaign/<int:cid>")
+def debug_campaign(cid):
+    """Returns full campaign + all referenced leads with their current sequence state."""
+    conn = get_db()
+    camp_row = conn.execute("SELECT * FROM campaigns WHERE id=?", [cid]).fetchone()
+    if not camp_row:
+        conn.close()
+        return jsonify({"error": "campaign not found"}), 404
+
+    camp = dict(camp_row)
+    try:
+        lead_ids = json.loads(camp.get("lead_ids_json") or "[]")
+    except Exception:
+        lead_ids = []
+    lead_ids = [int(x) for x in lead_ids if x]
+
+    leads = []
+    if lead_ids:
+        placeholders = ",".join("?" * len(lead_ids))
+        leads = rows_to_list(conn.execute(
+            f"""SELECT id, name, email, in_sequence, sequence_step, next_send_at,
+                       replied, unsubscribed, campaign_id, status
+                FROM leads WHERE id IN ({placeholders})""",
+            lead_ids).fetchall())
+
+    # Email log entries for this campaign's leads
+    log_entries = []
+    if lead_ids:
+        placeholders = ",".join("?" * len(lead_ids))
+        log_entries = rows_to_list(conn.execute(
+            f"""SELECT id, lead_id, step, to_email, status, sent_at, error_msg
+                FROM email_log WHERE lead_id IN ({placeholders})
+                ORDER BY sent_at DESC LIMIT 50""",
+            lead_ids).fetchall())
+
+    conn.close()
+    return jsonify({
+        "campaign":         camp,
+        "lead_ids_in_json": lead_ids,
+        "lead_ids_count":   len(lead_ids),
+        "leads_found":      len(leads),
+        "leads_in_sequence": sum(1 for l in leads if l.get("in_sequence")),
+        "leads_with_campaign_id": sum(1 for l in leads if l.get("campaign_id") == cid),
+        "leads":            leads,
+        "email_log":        log_entries,
+        "log_count":        len(log_entries),
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# DEBUG: Reset campaign to pending_approval (to allow re-approve)
+# ═══════════════════════════════════════════════════════════════════════
+@app.route("/api/debug/reset_campaign/<int:cid>", methods=["POST"])
+def reset_campaign(cid):
+    """Reset campaign to 'pending_approval' + clear in_sequence on its leads."""
+    conn = get_db()
+    camp = conn.execute("SELECT * FROM campaigns WHERE id=?", [cid]).fetchone()
+    if not camp:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+
+    try:
+        lead_ids = json.loads(camp["lead_ids_json"] or "[]")
+    except Exception:
+        lead_ids = []
+    lead_ids = [int(x) for x in lead_ids if x]
+
+    leads_reset = 0
+    if lead_ids:
+        placeholders = ",".join("?" * len(lead_ids))
+        conn.execute(
+            f"""UPDATE leads
+                SET in_sequence=0, sequence_step=0, next_send_at=NULL, campaign_id=NULL
+                WHERE id IN ({placeholders})""",
+            lead_ids)
+        leads_reset = len(lead_ids)
+
+    conn.execute("""UPDATE campaigns
+        SET status='pending_approval', approved_at=NULL, approved_by=NULL, actually_started=0
+        WHERE id=?""", [cid])
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "reset":        True,
+        "campaign_id":  cid,
+        "leads_reset":  leads_reset,
+        "next_step":    "POST /api/campaigns/" + str(cid) + "/approve to re-enroll leads"
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# DEBUG: Send a single test email to verify Zepto is configured + working
+# ═══════════════════════════════════════════════════════════════════════
+@app.route("/api/debug/test_zepto", methods=["POST"])
+def debug_test_zepto():
+    """Send a tiny test email to verify ZeptoMail credentials work."""
+    data = request.json or {}
+    to_email = (data.get("to") or "").strip()
+    if not to_email:
+        return jsonify({"error": "Provide 'to' in body"}), 400
+    try:
+        ok, err = send_via_zepto(
+            to_email, "Test Recipient",
+            "SKYMAXX Test Email — please ignore",
+            "<p>This is a test from SKYMAXX cron diagnostics.</p>",
+            log_id=None)
+        return jsonify({"ok": ok, "error": err or None, "to": to_email})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:300]}), 500
+
+
 # Start scheduler thread
 threading.Thread(target=scheduler_loop, daemon=True).start()
 
@@ -1780,32 +1960,84 @@ def create_campaign_draft():
 
 @app.route("/api/campaigns/<int:cid>/approve", methods=["POST"])
 def approve_campaign(cid):
-    """Approve campaign and actually enroll leads."""
+    """Approve campaign and actually enroll leads. Sets campaign_id, in_sequence, sequence_step.
+    Idempotent: works whether status is 'pending_approval' OR 'approved' (re-enrollment).
+    Returns detailed report of which leads were enrolled vs skipped + why."""
     conn = get_db()
-    camp = conn.execute("SELECT * FROM campaigns WHERE id=? AND status='pending_approval'",
-                        [cid]).fetchone()
+    camp = conn.execute("SELECT * FROM campaigns WHERE id=?", [cid]).fetchone()
     if not camp:
         conn.close()
-        return jsonify({"error": "campaign not found or not pending"}), 404
-    
-    lead_ids = json.loads(camp["lead_ids_json"])
+        return jsonify({"error": "campaign not found"}), 404
+
+    try:
+        lead_ids = json.loads(camp["lead_ids_json"] or "[]")
+    except Exception:
+        lead_ids = []
+
+    if not lead_ids:
+        conn.close()
+        return jsonify({"error": "campaign has no leads", "campaign_id": cid}), 400
+
     enrolled = 0
+    enrolled_ids = []
+    skipped = []
+    now_iso = datetime.utcnow().isoformat()
+
     for lid in lead_ids:
-        cur = conn.execute("""UPDATE leads 
-            SET in_sequence=1, sequence_step=0, next_send_at=?
-            WHERE id=? AND replied=0 AND unsubscribed=0""",
-            [datetime.utcnow().isoformat(), lid])
-        if cur.rowcount > 0: enrolled += 1
-    
+        try:
+            lid_int = int(lid)
+        except (ValueError, TypeError):
+            skipped.append({"id": lid, "reason": "invalid_id_format"})
+            continue
+
+        lead = conn.execute(
+            "SELECT id, email, replied, unsubscribed, in_sequence FROM leads WHERE id=?",
+            [lid_int]).fetchone()
+
+        if not lead:
+            skipped.append({"id": lid_int, "reason": "lead_not_in_db"})
+            continue
+        if not (lead["email"] or "").strip():
+            skipped.append({"id": lid_int, "reason": "no_email"})
+            continue
+        if lead["replied"]:
+            skipped.append({"id": lid_int, "reason": "already_replied"})
+            continue
+        if lead["unsubscribed"]:
+            skipped.append({"id": lid_int, "reason": "unsubscribed"})
+            continue
+
+        # ENROLL: set in_sequence + campaign_id + reset sequence_step + schedule first send
+        conn.execute("""UPDATE leads
+            SET in_sequence=1, sequence_step=0, next_send_at=?, campaign_id=?
+            WHERE id=?""",
+            [now_iso, cid, lid_int])
+        enrolled += 1
+        enrolled_ids.append(lid_int)
+
     approved_by = (request.json or {}).get("approved_by", "user")
-    conn.execute("""UPDATE campaigns 
+    conn.execute("""UPDATE campaigns
         SET status='approved', approved_at=?, approved_by=?, actually_started=?
-        WHERE id=?""", 
-        [datetime.utcnow().isoformat(), approved_by, enrolled, cid])
+        WHERE id=?""",
+        [now_iso, approved_by, enrolled, cid])
     conn.commit()
     conn.close()
-    
-    return jsonify({"approved": True, "campaign_id": cid, "enrolled": enrolled})
+
+    print(f"[approve] Campaign {cid}: enrolled {enrolled}/{len(lead_ids)} leads. "
+          f"Skipped {len(skipped)}: {skipped[:5]}")
+
+    return jsonify({
+        "approved":        True,
+        "campaign_id":     cid,
+        "enrolled":        enrolled,
+        "skipped":         len(skipped),
+        "skipped_reasons": skipped[:30],
+        "enrolled_ids":    enrolled_ids[:30],
+        "total_in_json":   len(lead_ids),
+        "message":         f"Enrolled {enrolled} of {len(lead_ids)} leads. "
+                          f"{len(skipped)} skipped (see skipped_reasons for details)."
+    })
+
 
 
 @app.route("/api/campaigns/<int:cid>/reject", methods=["POST"])
