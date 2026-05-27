@@ -1,38 +1,81 @@
-============================================================
-FINAL VERIFICATION
-============================================================
 
-=== Frontend ===
-  Quick: qs-source dropdown          : ✓
-  Quick: Orange Slice option         : ✓
-  Bulk: bulk-source dropdown         : ✓
-  Bulk: bulkSourceChanged            : ✓
-  Bulk passes source                 : ✓
-  Quick: linkedinGetEmail            : ✓
+======================================================================
+STEP 1: Inspect Campaign 1 — see what lead_ids_json contains
+======================================================================
+  Campaign name:           Outreach 5/25/2026
+  Campaign status:         approved
+  Approved at:             2026-05-26T03:07:34.969321
+  actually_started:        0
+  Lead IDs in JSON:        19
+  Leads found in DB:       0
+  Leads in_sequence=1:     0
+  Leads w/ campaign_id=1:  0
+  Email log entries:       0
 
-=== Backend endpoints ===
-  /api/linkedin/status: {"configured":true,"key_prefix":"osk_2eba..."}
+  First 5 lead IDs in JSON: [40, 41, 42, 43, 44]
 
+  Sample of leads:
 
-=== Quick Search — Orange Slice ===
-  HTTP 200 in 2.1s
-  Found 50 results
-    - Sergey Barysiuk | CTO, co-founder @ PandaDoc
-    - Keith Rabkin | Chief Executive Officer @ PandaDoc
+======================================================================
+STEP 2: Reset campaign 1 → pending_approval
+======================================================================
+  HTTP 200
+  Reset: True
+  Leads reset: 19
 
-=== Google Maps — Wyoming IT regression test ===
-  Attempt 1: HTTP 200 in 9.0s
-    Found 20 results
-      - Norms Technologies LLC | http://normstechnologies.com/
-      - Technologia Solutions | https://www.technologiasolutions.co
+======================================================================
+STEP 3: Re-approve campaign 1 — should now enroll all leads properly
+======================================================================
+  HTTP 200
+  Enrolled:        0
+  Skipped:         19
+  Total in JSON:   19
+  Message:         Enrolled 0 of 19 leads. 19 skipped (see skipped_reasons for details).
+  Skip reasons:
+    - {'id': 40, 'reason': 'lead_not_in_db'}
+    - {'id': 41, 'reason': 'lead_not_in_db'}
+    - {'id': 42, 'reason': 'lead_not_in_db'}
+    - {'id': 43, 'reason': 'lead_not_in_db'}
+    - {'id': 44, 'reason': 'lead_not_in_db'}
+    - {'id': 45, 'reason': 'lead_not_in_db'}
+    - {'id': 46, 'reason': 'lead_not_in_db'}
+    - {'id': 47, 'reason': 'lead_not_in_db'}
+    - {'id': 48, 'reason': 'lead_not_in_db'}
+    - {'id': 49, 'reason': 'lead_not_in_db'}
 
-=== Bulk Search — Orange Slice ===
-  HTTP 200 in 3.7s
-  Found 50 unique results across 2 combos
-    - Sergey Barysiuk | CTO, co-founder @ PandaDoc
-    - Keith Rabkin | Chief Executive Officer @ PandaDoc
-    - Richard Bray | CFO @ PandaDoc
+======================================================================
+STEP 4: Verify state — check stats + debug campaign
+======================================================================
+  Total leads:    14
+  In sequence:    0  ← should now be > 0
+  With email:     14
+  Today sent:     0
+  Total sent:     0
 
-=== Lead 72 (Orange Slice saved lead) ===
-  Total: 14
-  Found id=72: Sergey Barysiuk | website=https://www.linkedin.com/in/siarheibarysiuk | company=None
+======================================================================
+STEP 5: Trigger /api/cron/process — this is what external cron will call
+======================================================================
+  HTTP 200
+  OK:                       False
+  Started:                  2026-05-27T02:35:46.614127
+  Completed:                2026-05-27T02:35:47.900089
+  Sends pending BEFORE:     0
+  Sends pending AFTER:      0
+  Sends THIS RUN:           0
+  Send error:               relation "daily_send_count" does not exist
+LINE 1: SELECT count FROM daily_send_count WHERE date='2026-05-27'
+                          ^
+
+  Replies processed:        1
+  Replies error:            None
+
+======================================================================
+STEP 6: Final state — what is now in the DB?
+======================================================================
+  Total sent:     0
+  Today sent:     0
+  In sequence:    0
+  Total failed:   0
+
+  --- Recent email log ---
+  Total log entries: 0
