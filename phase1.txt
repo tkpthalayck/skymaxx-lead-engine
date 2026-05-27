@@ -1,0 +1,90 @@
+
+======================================================================
+1A. APPLICATION HEALTH
+======================================================================
+  [OK] HTTP 200 | 1.44s | /api/stats
+  [OK] HTTP 200 | 1.42s | /api/config
+  [OK] HTTP 200 | 0.17s | /api/leads?per_page=100
+  [OK] HTTP 200 | 0.15s | /api/campaigns
+  [OK] HTTP 200 | 0.26s | /api/log
+  [OK] HTTP 200 | 0.21s | /api/sequence/queue
+  [OK] HTTP 200 | 0.31s | /api/groups
+  [OK] HTTP 200 | 0.19s | /api/debug/db
+  [OK] HTTP 200 | 0.11s | /api/linkedin/status
+
+======================================================================
+1B. STATS DEEP DIVE
+======================================================================
+  bcc_support          = True
+  daily_limit          = 300
+  in_sequence          = 0
+  replied              = 0
+  today_sent           = 0
+  total_failed         = 0
+  total_leads          = 14
+  total_sent           = 0
+  with_email           = 14
+
+======================================================================
+1C. LEAD STATE
+======================================================================
+  Total leads (DB): 14
+  Leads returned: 14
+  In sequence: 0
+  With email:  14
+  Replied:     0
+
+  ⚠️  NO LEADS IN SEQUENCE — this is a major problem if campaigns were approved!
+
+  SAMPLE LEADS (first 5):
+    id=72 | Sergey Barysiuk | info@linkedin.com | in_seq=0 | campaign=None
+    id=59 | Aaron Barak | abarak@maximaapparel.com | in_seq=0 | campaign=None
+    id=60 | Chris Kucharski | chris.kucharski@onerail.io | in_seq=0 | campaign=None
+    id=61 | Hank Jackson | hank.jackson@edgewaterit.com | in_seq=0 | campaign=None
+    id=62 | James Stanford | james.stanford@edgewaterit.com | in_seq=0 | campaign=None
+
+======================================================================
+1D. CAMPAIGNS
+======================================================================
+  Total campaigns: 1
+
+  Campaign id=1: Outreach 5/25/2026
+    status               = approved
+    approved_at          = 2026-05-26T03:07:34.969321
+    created_at           = Mon, 25 May 2026 13:22:04 GMT
+    total_leads          = None
+    actually_started     = 0
+    actually_sent        = 0
+    actually_failed      = 0
+    actually_replied     = 0
+
+======================================================================
+1E. EMAIL LOG (every send attempt)
+======================================================================
+  Total log entries: 0
+  ⚠️  EMAIL LOG IS EMPTY — no sends recorded
+
+======================================================================
+1F. UPCOMING SENDS (scheduler queue)
+======================================================================
+  Upcoming sends in queue: 0
+  ⚠️  NO UPCOMING SENDS — scheduler sees nothing due
+
+======================================================================
+1G. SCHEDULER ENDPOINTS — are they exposed?
+======================================================================
+  404 | /api/cron/process
+  404 | /api/scheduler/run
+  404 | /api/sequence/process
+  404 | /api/cron/replies
+  404 | /api/send/process
+  404 | /api/admin/run_sequence
+
+======================================================================
+SUMMARY
+======================================================================
+Audit complete. Key questions for diagnosis:
+1. Are leads in_sequence=1?  (if not, "Start Campaign" failed)
+2. Is the email_log empty?  (if yes, no sends ever attempted)
+3. Is /api/sequence/queue empty?  (if yes, scheduler sees no due work)
+4. Is there a cron/scheduler endpoint?  (Render free tier has NO background workers)
