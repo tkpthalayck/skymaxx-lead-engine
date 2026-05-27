@@ -1,0 +1,86 @@
+
+======================================================================
+STEP 1: Verify schema — all tables present?
+======================================================================
+  [OK] campaigns: ok
+  [OK] contact_groups: ok
+  [OK] daily_send_count: ok
+  [OK] email_log: ok
+  [OK] lead_group_assignments: ok
+  [OK] leads: ok
+  [OK] sequences: ok
+  [OK] tracking_events: ok
+
+======================================================================
+STEP 2: Fix Campaign 1 — replace stale IDs with current valid leads
+======================================================================
+  Fixed:           True
+  New lead count:  14
+  New IDs:         [59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72]
+
+======================================================================
+STEP 3: Approve campaign 1 (NOW with valid leads)
+======================================================================
+  Enrolled:        14 / 14
+  Skipped:         0
+  Enrolled IDs:    [59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72]
+
+======================================================================
+STEP 4: Verify leads are now in_sequence
+======================================================================
+  Total leads:    14
+  In sequence:    14   ← should be 14!
+  With email:     14
+
+======================================================================
+STEP 5: Check upcoming sequence queue
+======================================================================
+  Upcoming sends in queue: 14
+    Sergey Barysiuk → step None | due None
+    Aaron Barak → step None | due None
+    Chris Kucharski → step None | due None
+    Hank Jackson → step None | due None
+    James Stanford → step None | due None
+    Raymond Churgovich → step None | due None
+    Tom Monahan → step None | due None
+    Michael Hinman → step None | due None
+    Dan Aldis → step None | due None
+    Liam Connor → step None | due None
+
+======================================================================
+STEP 6: Trigger CRON — should now send first emails
+======================================================================
+  HTTP 500
+  <html>
+  <head>
+    <title>Internal Server Error</title>
+  </head>
+  <body>
+    <h1><p>Internal Server Error</p></h1>
+    
+  </body>
+</html>
+
+
+======================================================================
+STEP 7: Final dashboard state
+======================================================================
+  Total leads:    14
+  In sequence:    14
+  Today sent:     0
+  Total sent:     11
+  Total failed:   0
+
+  --- Email log (every send attempt) ---
+  Total entries: 11
+    Wed, 27 May 2026 02 | step=1 | status=success | to=mark.hawkins-wood@intercity.te
+    Wed, 27 May 2026 02 | step=1 | status=success | to=liam.connor@intercity.technolo
+    Wed, 27 May 2026 02 | step=1 | status=success | to=daldis@halvik.com
+    Wed, 27 May 2026 02 | step=1 | status=success | to=michael.hinman@edgewaterit.com
+    Wed, 27 May 2026 02 | step=1 | status=success | to=tom.monahan@edgewaterit.com
+    Wed, 27 May 2026 02 | step=1 | status=success | to=rchurgovich@broomfield.org
+    Wed, 27 May 2026 02 | step=1 | status=success | to=james.stanford@edgewaterit.com
+    Wed, 27 May 2026 02 | step=1 | status=success | to=hank.jackson@edgewaterit.com
+    Wed, 27 May 2026 02 | step=1 | status=success | to=chris.kucharski@onerail.io
+    Wed, 27 May 2026 02 | step=1 | status=success | to=abarak@maximaapparel.com
+    Wed, 27 May 2026 02 | step=1 | status=success | to=info@linkedin.com
