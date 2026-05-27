@@ -1,0 +1,85 @@
+
+======================================================================
+0A. CORE ENDPOINTS HEALTH
+======================================================================
+  [OK] HTTP 200 | 1.05s | /api/stats
+  [OK] HTTP 200 | 0.14s | /api/campaigns
+  [OK] HTTP 200 | 0.27s | /api/leads?per_page=200
+  [OK] HTTP 200 | 0.14s | /api/log
+  [OK] HTTP 200 | 0.30s | /api/sequence/queue
+  [OK] HTTP 200 | 0.12s | /api/config
+  [OK] HTTP 200 | 0.11s | /api/debug/db
+  [OK] HTTP 200 | 0.15s | /api/debug/ensure_schema
+
+======================================================================
+0B. STATS — what does dashboard see?
+======================================================================
+  bcc_support          = True
+  daily_limit          = 300
+  in_sequence          = 14
+  replied              = 0
+  today_sent           = 0
+  total_failed         = 0
+  total_leads          = 14
+  total_sent           = 14
+  with_email           = 14
+
+======================================================================
+0C. ALL CAMPAIGNS — full state
+======================================================================
+  Total campaigns: 1
+
+  Campaign id=1: Outreach 5/25/2026
+    status               = approved
+    approved_at          = 2026-05-27T02:40:23.315397
+    created_at           = Mon, 25 May 2026 13:22:04 GMT
+    recipient_count      = 14
+    actually_started     = 14
+    actually_sent        = 0
+    actually_failed      = 0
+    actually_replied     = 0
+
+======================================================================
+0D. EMAIL LOG — what has been sent?
+======================================================================
+  Total entries: 14
+  Success: 14
+  Failed:  0
+
+  Last 10:
+    Wed, 27 May 2026 02:41:1 | step=1 | success | ampem.dako@intercity.technology
+    Wed, 27 May 2026 02:41:1 | step=1 | success | rick.korsak@intercity.technology
+    Wed, 27 May 2026 02:41:0 | step=1 | success | stewart.nicol@intercity.technolo
+    Wed, 27 May 2026 02:40:5 | step=1 | success | mark.hawkins-wood@intercity.tech
+    Wed, 27 May 2026 02:40:4 | step=1 | success | liam.connor@intercity.technology
+    Wed, 27 May 2026 02:40:4 | step=1 | success | daldis@halvik.com
+    Wed, 27 May 2026 02:40:4 | step=1 | success | michael.hinman@edgewaterit.com
+    Wed, 27 May 2026 02:40:4 | step=1 | success | tom.monahan@edgewaterit.com
+    Wed, 27 May 2026 02:40:3 | step=1 | success | rchurgovich@broomfield.org
+    Wed, 27 May 2026 02:40:3 | step=1 | success | james.stanford@edgewaterit.com
+
+======================================================================
+0E. SCHEMA — all tables present?
+======================================================================
+  [OK] campaigns: ok
+  [OK] contact_groups: ok
+  [OK] daily_send_count: ok
+  [OK] email_log: ok
+  [OK] lead_group_assignments: ok
+  [OK] leads: ok
+  [OK] sequences: ok
+  [OK] tracking_events: ok
+
+======================================================================
+0F. LEAD STATE
+======================================================================
+  Total: 14
+  In sequence: 14
+  With email:  14
+  Replied:     0
+  Linked to campaign: 14
+
+======================================================================
+0G. LOGO FILE
+======================================================================
+  /static/logo.png: HTTP 0 | bytes: N/A
