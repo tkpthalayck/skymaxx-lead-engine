@@ -799,11 +799,13 @@ def scheduler_loop():
             print(f"[scheduler] Error: {e}")
         time.sleep(60)
 
-def process_pending_sends():
+def process_pending_sends(max_per_run=None):
     today_count = get_todays_send_count()
     if today_count >= DAILY_SEND_LIMIT:
         return
     remaining = DAILY_SEND_LIMIT - today_count
+    if max_per_run is not None:
+        remaining = min(remaining, max_per_run)
 
     conn = get_db()
     now = datetime.utcnow().isoformat()
@@ -889,7 +891,8 @@ def cron_process():
         conn.close()
 
         report["sends"]["before_pending"] = before_pending
-        process_pending_sends()
+        # Cap to 8 sends per cron run (fits in Render's 30s HTTP budget; cron runs every 5min anyway)
+        process_pending_sends(max_per_run=8)
 
         conn = get_db()
         after_pending = conn.execute("""
