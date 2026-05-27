@@ -1,0 +1,68 @@
+name: SequenceProcessor
+# Pings /api/cron/process every 5 minutes to drive the email sequence engine.
+# Required because Render free tier kills background workers when idle.
+
+on:
+  # Run every 5 minutes
+  schedule:
+    - cron: '*/5 * * * *'
+  # Allow manual triggering from the Actions UI
+  workflow_dispatch: 
+
+# Required so the workflow can write its log file
+permissions:
+  contents: write
+
+# Prevent overlapping runs
+concurrency:
+  group: sequence-processor
+  cancel-in-progress: false
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ping /api/cron/process
+        id: ping
+        run: |
+          set -e
+          echo "Triggering cron at $(date -u +%FT%TZ)"
+          RESPONSE=$(curl -sS -w "\n%{http_code}" --max-time 60 \
+            -X POST -H "Content-Type: application/json" \
+            "https://skymaxx-lead-engine.onrender.com/api/cron/process" -d '{}' || echo "FAILED")
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "HTTP $HTTP_CODE"
+          echo "$BODY"
+          
+          # Save to a rolling log
+          mkdir -p .cron_logs
+          DATE=$(date -u +%Y-%m-%d)
+          LINE="$(date -u +%FT%TZ) | HTTP $HTTP_CODE | $BODY"
+          echo "$LINE" >> ".cron_logs/${DATE}.log"
+          
+          # Keep only last 7 days of logs
+          find .cron_logs -name "*.log" -mtime +7 -delete 2>/dev/null || true
+          
+          # Set output for next step
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            # Don't fail the whole workflow — just log it
+          fi
+
+      - name: Commit log
+        if: always()
+        run: |
+          git config user.email "cron@github-actions"
+          git config user.name "Cron Bot"
+          git add -f .cron_logs/ 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "cron tick [skip ci]"
+          git push || echo "(push failed - probably nothing to commit)"
