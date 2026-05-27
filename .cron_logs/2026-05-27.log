@@ -1,1 +1,2 @@
 2026-05-27T07:32:18Z | HTTP 200 | {"completed_at":"2026-05-27T07:32:18.339846","ok":true,"replies":{"error":null,"processed":1},"sends":{"after_pending":0,"before_pending":0,"error":null,"sent_this_run":0},"started_at":"2026-05-27T07:32:16.756427"}
+2026-05-27T11:04:46Z | HTTP 200 | {"campaigns_updated":true,"completed_at":"2026-05-27T11:04:46.396403","ok":true,"replies":{"error":null,"processed":1},"sends":{"after_pending":0,"before_pending":0,"error":null,"sent_this_run":0},"started_at":"2026-05-27T11:04:44.647239"}
