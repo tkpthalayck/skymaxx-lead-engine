@@ -1,0 +1,17 @@
+name: Phase0
+on: { workflow_dispatch: , push: { paths: ['phase0.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 phase0.py
+      - if: always()
+        run: |
+          git config user.email "b@s.c"
+          git config user.name "B"
+          git add -f phase0.txt 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "p0 [skip ci]"
+          git push || true
