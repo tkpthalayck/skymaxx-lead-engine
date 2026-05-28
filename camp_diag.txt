@@ -1,35 +1,35 @@
-=== CAMPAIGN CREATION FLOW DIAGNOSTIC ===
+====================================================================
+CAMPAIGN 1 DEEP DIAGNOSTIC
+====================================================================
+Campaign status: running
+actually_sent:   14
+actually_failed: 0
+actually_replied:0
+lead_ids count:  14
+leads in_seq:    14
 
-STEP 1: Search
-  HTTP 200 in 9.7s
-  Got 5 leads (showing first 5)
-  - Xedos Technologies LLC - IT Su | email=NONE | website=True
-  - Peniel Technology LLC | email=NONE | website=True
-  - VRS Technologies LLC | email=NONE | website=True
-  - Meridian IT Solutions | Websit | email=NONE | website=True
-  - Cloud Tech IT Solutions L.L.C | email=NONE | website=True
+PER-LEAD STATE (sequence_step + next_send_at):
+  (current UTC: 2026-05-28T10:17:19)
 
-STEP 2: Enrich emails (first 4)
-  HTTP 200 in 4.4s
-  Got 4 email results
-  - Xedos Technologies LLC - IT Su -> info@xedos.ae (generated)
-  - Peniel Technology LLC -> info@penieltech.com (scraped)
-  - VRS Technologies LLC -> info@vrstech.com (generated)
-  - Meridian IT Solutions | Websit -> info@meridianuae.com (scraped)
+  id=72  step=1 in_seq=1 next_send=2026-05-30T02:40:25 replied=0
+  id=59  step=1 in_seq=1 next_send=2026-05-30T02:40:28 replied=0
+  id=65  step=1 in_seq=1 next_send=2026-05-30T02:40:45 replied=0
+  id=60  step=1 in_seq=1 next_send=2026-05-30T02:40:31 replied=0
+  id=63  step=1 in_seq=1 next_send=2026-05-30T02:40:39 replied=0
+  id=67  step=1 in_seq=1 next_send=2026-05-30T02:40:50 replied=0
+  id=68  step=1 in_seq=1 next_send=2026-05-30T02:40:53 replied=0
+  id=61  step=1 in_seq=1 next_send=2026-05-30T02:40:34 replied=0
+  id=62  step=1 in_seq=1 next_send=2026-05-30T02:40:36 replied=0
+  id=64  step=1 in_seq=1 next_send=2026-05-30T02:40:42 replied=0
+  id=66  step=1 in_seq=1 next_send=2026-05-30T02:40:47 replied=0
+  id=70  step=1 in_seq=1 next_send=2026-05-30T02:41:12 replied=0
+  id=71  step=1 in_seq=1 next_send=2026-05-30T02:41:15 replied=0
+  id=69  step=1 in_seq=1 next_send=2026-05-30T02:41:10 replied=0
 
-STEP 3: Save selected leads (with full lead objects)
-  HTTP 200 in 0.1s
-  Response: {'lead_ids': [15, 16, 17], 'saved': 3}
-  Saved 3 leads, IDs: [15, 16, 17]
+SUMMARY:
+  Due now (should send next cron): 0
+  Scheduled future (waiting):      14
+  Finished/not in seq:             0
 
-STEP 4: Create campaign draft
-  HTTP 200 in 1.7s
-  ✓ CAMPAIGN CREATED: id=3, status=pending_approval
-  Recipient count: 3
-  Risk score: 0
-
-STEP 5: List campaigns
-  Total campaigns: 3
-  - id=3 name=Test Campaign 1779651629 status=pending_approval recipients=3
-  - id=2 name=Outreach 5/24/2026 status=pending_approval recipients=13
-  - id=1 name=Outreach 5/24/2026 status=pending_approval recipients=1
+Email log total: 14
+By step: {1: 14}
