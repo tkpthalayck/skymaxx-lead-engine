@@ -1698,6 +1698,38 @@ async function qsSaveOnly() {
   renderQSResults();
 }
 
+async function createCampaign(mode) {
+  // Leads-page campaign creation (selected leads OR all eligible)
+  let leadIds;
+  if (mode === 'selected') {
+    if (!selected || !selected.size) { alert('Select at least one lead first (tick the checkboxes).'); return; }
+    leadIds = Array.from(selected);
+  } else if (mode === 'all') {
+    leadIds = 'all';  // backend resolves all eligible leads (with email, not already in sequence)
+  } else {
+    leadIds = 'all';
+  }
+  const name = prompt('Campaign name:', 'Outreach ' + new Date().toLocaleDateString());
+  if (name === null) return;
+  try {
+    const r = await fetch('/api/campaigns/draft', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name: name, lead_ids: leadIds})
+    }).then(res => res.json());
+    if (r.error) { alert('Could not create campaign: ' + r.error); return; }
+    currentCampaignId = r.campaign_id;
+    if (selected && selected.clear) selected.clear();
+    if (typeof showApprovalModal === 'function') {
+      showApprovalModal(r);
+    } else {
+      alert('Campaign "' + name + '" created with ' + (r.recipient_count || r.lead_count || '?') + ' leads. Go to Campaigns tab to approve.');
+    }
+    if (typeof loadLeads === 'function') loadLeads(typeof leadsPage !== 'undefined' ? leadsPage : 1);
+  } catch (e) {
+    alert('Error creating campaign: ' + e.message);
+  }
+}
+
 async function qsCreateCampaign() {
   if (!qsSelected.size) { alert('Select at least one lead'); return; }
   const selected = qsResults.filter(r => qsSelected.has(r.place_id));
