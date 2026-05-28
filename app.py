@@ -128,6 +128,48 @@ def logout():
 
 
 
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# GLOBAL ERROR HANDLERS — guarantee /api/* always returns JSON, never HTML
+# ═══════════════════════════════════════════════════════════════════════
+@app.errorhandler(404)
+def _api_json_404(e):
+    from flask import request, jsonify
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "not found", "path": request.path}), 404
+    return e
+
+@app.errorhandler(405)
+def _api_json_405(e):
+    from flask import request, jsonify
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "method not allowed", "path": request.path}), 405
+    return e
+
+@app.errorhandler(500)
+def _api_json_500(e):
+    from flask import request, jsonify
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "server error", "detail": str(e)[:200]}), 500
+    return e
+
+@app.errorhandler(Exception)
+def _api_json_error(e):
+    from flask import request, jsonify
+    import traceback
+    if request.path.startswith("/api/"):
+        # Log full traceback to stderr, return safe JSON to client
+        print(f"[api error] {request.path}: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "error": type(e).__name__,
+            "detail": str(e)[:300]
+        }), 500
+    # Non-API routes — let Flask's default HTML error pages handle
+    raise e
+
+
 @app.after_request
 def add_no_cache_headers(response):
     """Prevent browsers from caching the HTML/JS so users always get the latest UI."""
