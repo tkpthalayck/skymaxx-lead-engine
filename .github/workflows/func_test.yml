@@ -1,0 +1,16 @@
+name: FuncTest
+on: { workflow_dispatch: , push: { paths: ['func_test.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 func_test.py
+      - if: always()
+        run: |
+          git config user.email "b@s.c"; git config user.name "B"
+          git add -f func_test.txt 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "ft [skip ci]"
+          git push || true
