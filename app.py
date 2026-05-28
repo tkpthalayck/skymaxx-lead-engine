@@ -13,6 +13,112 @@ load_dotenv()
 
 app = Flask(__name__)
 
+# ═══════════════════════════════════════════════════════════════════════
+# AUTHENTICATION
+# ═══════════════════════════════════════════════════════════════════════
+import secrets as _secrets
+from functools import wraps as _wraps
+
+# Session secret (random fallback if env not set — sessions invalidate on restart, which is fine)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY") or _secrets.token_hex(32)
+
+# Credentials from env vars (with a default that DEMANDS to be changed)
+AUTH_USER     = os.environ.get("SKYMAXX_AUTH_USER", "admin")
+AUTH_PASSWORD = os.environ.get("SKYMAXX_AUTH_PASSWORD", "SKYMAXX@2026")
+CRON_SECRET   = os.environ.get("SKYMAXX_CRON_SECRET", "skx-cron-7eb2f3a4c9d1")
+
+# Public endpoints that don't require login
+_PUBLIC_ENDPOINTS = {"login", "static", "logout"}
+
+# Endpoints that allow CRON_SECRET as alternative auth (for GitHub Actions cron)
+_CRON_ENDPOINTS = {"cron_process"}
+
+
+@app.before_request
+def require_auth():
+    from flask import session, request, redirect, url_for, jsonify
+    endpoint = request.endpoint or ""
+
+    # Allow public endpoints + static files
+    if endpoint in _PUBLIC_ENDPOINTS:
+        return None
+
+    # For cron endpoints, accept X-Cron-Secret header OR ?token= as alternative to session
+    if endpoint in _CRON_ENDPOINTS:
+        provided = request.headers.get("X-Cron-Secret") or request.args.get("token") or ""
+        if provided and provided == CRON_SECRET:
+            return None
+        # No valid cron secret → fall through to session check
+
+    # Session-based auth
+    if session.get("user"):
+        return None
+
+    # Not authenticated — API → JSON 401, page → redirect to login
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "unauthorized", "login_url": "/login"}), 401
+    return redirect(url_for("login"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    from flask import session, request, redirect, url_for, render_template_string
+    error = None
+    if request.method == "POST":
+        u = (request.form.get("username") or "").strip()
+        p = request.form.get("password") or ""
+        if u == AUTH_USER and p == AUTH_PASSWORD:
+            session.permanent = True
+            session["user"] = u
+            return redirect(request.args.get("next") or url_for("index"))
+        error = "Invalid username or password"
+
+    page = """<!doctype html><html><head>
+    <title>SKYMAXX Login</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="icon" href="/static/favicon.png" type="image/png"/>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+      body{background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+      .card{background:white;border-radius:12px;padding:40px;width:100%;max-width:400px;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+      .logo{text-align:center;margin-bottom:24px}
+      .logo img{width:80px;height:80px}
+      h1{font-size:24px;font-weight:700;color:#0f172a;text-align:center;margin-bottom:8px}
+      .sub{text-align:center;color:#64748b;font-size:13px;margin-bottom:28px}
+      label{display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:6px}
+      input{width:100%;padding:11px 14px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:16px;transition:border-color .2s}
+      input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+      button{width:100%;padding:12px;background:#3b82f6;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background .2s}
+      button:hover{background:#2563eb}
+      .error{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:16px}
+      .hint{margin-top:18px;text-align:center;font-size:11px;color:#94a3b8}
+    </style></head><body>
+    <div class="card">
+      <div class="logo"><img src="/static/logo.png" alt="SKYMAXX"/></div>
+      <h1>SKYMAXX Lead Engine</h1>
+      <div class="sub">Sign in to continue</div>
+      {% if error %}<div class="error">{{ error }}</div>{% endif %}
+      <form method="POST">
+        <label>Username</label>
+        <input name="username" autofocus autocomplete="username" required>
+        <label>Password</label>
+        <input name="password" type="password" autocomplete="current-password" required>
+        <button type="submit">Sign in</button>
+      </form>
+      <div class="hint">Authorized access only</div>
+    </div>
+    </body></html>"""
+    return render_template_string(page, error=error)
+
+
+@app.route("/logout")
+def logout():
+    from flask import session, redirect, url_for
+    session.clear()
+    return redirect(url_for("login"))
+
+
+
 @app.after_request
 def add_no_cache_headers(response):
     """Prevent browsers from caching the HTML/JS so users always get the latest UI."""
