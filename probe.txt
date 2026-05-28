@@ -1,0 +1,19 @@
+============================================================
+PROBE: what does the search endpoint return?
+============================================================
+
+Step 1: Login
+  HTTP 200
+  Final URL: https://skymaxx-lead-engine.onrender.com/
+  Cookies: ['session']
+
+Step 2: POST /api/search/v2/preview with cookie
+  HTTP 200
+  Content-Type: application/json
+  Body starts with: '{"found":20,"location_label":"Dubai, AE","note":null,"query":"restaurant in Dubai, AE","results":[{"address":"Tower 2 - Level 54, Address Sky View Hotel - \\u0628\\u0648\\u0644\\u064a\\u0641\\u0627\\u0631\\u0'
+  Body length: 10835
+  JSON parsed OK. Keys: ['found', 'location_label', 'note', 'query', 'results', 'search_all_categories']
+  Results count: 20
+
+Step 3: GET /api/stats with cookie (control)
+  HTTP 200 ✓ application/json
