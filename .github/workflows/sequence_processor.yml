@@ -33,6 +33,7 @@ jobs:
           echo "Triggering cron at $(date -u +%FT%TZ)"
           RESPONSE=$(curl -sS -w "\n%{http_code}" --max-time 60 \
             -X POST -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: skx-cron-7eb2f3a4c9d1" \
             "https://skymaxx-lead-engine.onrender.com/api/cron/process" -d '{}' || echo "FAILED")
           
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
