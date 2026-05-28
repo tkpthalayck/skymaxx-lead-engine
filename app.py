@@ -2118,6 +2118,32 @@ def list_campaigns():
     conn = get_db()
     rows = rows_to_list(conn.execute("""SELECT * FROM campaigns 
         ORDER BY created_at DESC LIMIT 50""").fetchall())
+    # Enrich each campaign with next_send_at + live sent count
+    for c in rows:
+        try:
+            lead_ids = json.loads(c.get("lead_ids_json") or "[]")
+            lead_ids = [int(x) for x in lead_ids if x]
+        except Exception:
+            lead_ids = []
+        if lead_ids:
+            ph = ",".join("?" * len(lead_ids))
+            # next scheduled send among active leads
+            nxt = conn.execute(
+                f"""SELECT MIN(next_send_at) FROM leads
+                    WHERE id IN ({ph}) AND in_sequence=1 AND replied=0 AND unsubscribed=0
+                    AND sequence_step < 5""", lead_ids).fetchone()[0]
+            c["next_send_at"] = nxt
+            # progress: how many leads finished vs total
+            finished = conn.execute(
+                f"""SELECT COUNT(*) FROM leads WHERE id IN ({ph})
+                    AND (sequence_step >= 5 OR replied=1 OR unsubscribed=1)""",
+                lead_ids).fetchone()[0]
+            c["leads_finished"] = finished
+            c["leads_total"] = len(lead_ids)
+        else:
+            c["next_send_at"] = None
+            c["leads_finished"] = 0
+            c["leads_total"] = 0
     conn.close()
     return jsonify({"campaigns": rows})
 
