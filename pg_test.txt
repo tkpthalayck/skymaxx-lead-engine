@@ -1,0 +1,5 @@
+PAGINATION TEST (after retry fix)
+==================================================
+HTTP 200 in 21.6s
+Leads returned: 20  (still 20 — Dubai may have limited results, try broad)
+Field coverage: phone=20/20 website=20/20
