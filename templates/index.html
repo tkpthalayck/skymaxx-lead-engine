@@ -1261,85 +1261,61 @@ if (typeof qsSelected === 'undefined') { window.qsSelected = new Set(); }
 function renderQSResults() {
   const div = document.getElementById('qs-results');
   if (!div) {
-    console.error('[renderQSResults] qs-results div NOT FOUND');
+    console.error('[renderQSResults] qs-results div NOT FOUND in DOM');
+    alert('Render error: qs-results div missing in page'); return;
+  }
+  console.log('[renderQSResults] starting, qsResults =', qsResults ? qsResults.length : 'null/undefined');
+  
+  if (!qsResults || qsResults.length === 0) {
+    div.innerHTML = '<div class="empty"><i class="fas fa-search"></i><p>No results yet — try a search above</p></div>';
+    if (typeof updateQSCount === 'function') updateQSCount();
     return;
   }
-  // Visible debug banner so we can see what's happening
-  console.log('[renderQSResults] starting | qsResults.length=', qsResults ? qsResults.length : 'null');
-  if (!qsResults || !qsResults.length) {
-    div.innerHTML = '<div class="empty"><i class="fas fa-search"></i><p>No results</p></div>';
-    updateQSCount(); return;
+  
+  // Build a SIMPLE, bulletproof card for each result.
+  // Each card is built with safe string concatenation (no template literals, no escaping nightmares).
+  const parts = [];
+  parts.push('<div style="padding:8px 0;font-size:12px;color:#64748b">Showing ' + qsResults.length + ' leads. Click a card to select it, then use "Add to New Campaign".</div>');
+  
+  for (let i = 0; i < qsResults.length; i++) {
+    const r = qsResults[i];
+    const pid = String(r.place_id || ('lead-' + i));
+    const safePid = pid.replace(/'/g, '');  // strip any apostrophes that would break onclick
+    const isSel = qsSelected.has(pid);
+    const name = String(r.name || 'Unnamed');
+    const email = String(r.email || '');
+    const phone = String(r.phone || '');
+    const website = String(r.website || '');
+    const address = String(r.address || '');
+    const country = String(r.country || '');
+    const category = String(r.category || '');
+    
+    const cardStyle = isSel
+      ? 'border:2px solid #3b82f6;background:#eff6ff;border-radius:8px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;gap:12px;align-items:flex-start'
+      : 'border:1px solid #e2e8f0;background:white;border-radius:8px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;gap:12px;align-items:flex-start';
+    
+    parts.push(
+      '<div class="search-result ' + (isSel ? 'selected' : '') + '" id="qsr-' + safePid + '" style="' + cardStyle + '" onclick="qsCardClick(event, \'' + safePid + '\')">' +
+        '<input type="checkbox" style="width:20px;height:20px;margin-top:2px;flex-shrink:0" ' +
+          (isSel ? 'checked' : '') + 
+          ' onclick="event.stopPropagation()" onchange="qsToggle(\'' + safePid + '\', this)"/>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:600;font-size:14px;color:#0f172a;margin-bottom:4px">' + escapeHtml(name) + '</div>' +
+          '<div style="font-size:12px;color:#475569;display:flex;flex-wrap:wrap;gap:12px">' +
+            (email ? '<span><i class="fas fa-envelope" style="color:#34d399"></i> ' + escapeHtml(email) + '</span>' : '<span style="color:#94a3b8"><i class="fas fa-envelope-open"></i> no email</span>') +
+            (phone ? '<span><i class="fas fa-phone"></i> ' + escapeHtml(phone) + '</span>' : '') +
+            (website ? '<span><i class="fas fa-globe"></i> <a href="' + escapeHtml(website) + '" target="_blank" onclick="event.stopPropagation()" style="color:#3b82f6">' + escapeHtml(website.replace(/^https?:\/\//,'').slice(0,40)) + '</a></span>' : '') +
+            (category ? '<span style="background:#f1f5f9;padding:2px 8px;border-radius:4px;font-size:10px">' + escapeHtml(category) + '</span>' : '') +
+          '</div>' +
+          (address ? '<div style="font-size:11px;color:#94a3b8;margin-top:4px"><i class="fas fa-map-marker-alt"></i> ' + escapeHtml(address.slice(0,80)) + '</div>' : '') +
+        '</div>' +
+      '</div>'
+    );
   }
-  try {
-  const cardHtml = qsResults.map((r, idx) => {
-    try {
-    const isSel    = qsSelected.has(r.place_id);
-    const sel      = isSel ? 'selected' : '';
-    const already  = r.already_saved ? 'already' : '';
-    const webShort = r.website ? r.website.replace(/^https?:\/\//,'').slice(0,40) : '';
-    const isOS     = r.source === 'orange_slice';
-
-    // Build meta line — different fields for Orange Slice vs Google Maps
-    let metaHtml;
-    if (isOS) {
-      // Orange Slice / LinkedIn — show LinkedIn + Title + Company + Location
-      const emailBlock = r.email
-        ? '<span><i class="fas fa-envelope"></i><span style="color:#34d399">✓ ' + r.email + '</span> <span style="color:#34d399;font-size:9px">verified</span></span>'
-        : '<span><i class="fas fa-envelope-open" style="color:var(--muted)"></i><button class="btn btn-outline btn-xs" disabled style="opacity:0.5;cursor:not-allowed" title="🔒 Orange Slice credit usage is locked. Email enrichment is disabled to prevent unexpected charges."><i class="fas fa-lock"></i> Get Email (locked)</button></span>';
-      metaHtml =
-        emailBlock +
-        (r.jobTitle ? '<span><i class="fas fa-user-tie"></i>' + escapeHtml(r.jobTitle) + '</span>' : '') +
-        (r.company  ? '<span><i class="fas fa-building"></i>' + escapeHtml(r.company)  + '</span>' : '') +
-        (r.linkedinUrl ? '<span><a href="' + r.linkedinUrl + '" target="_blank" style="color:#0a66c2;text-decoration:none"><i class="fab fa-linkedin"></i> View Profile</a></span>' : '') +
-        (r.address ? '<span><i class="fas fa-map-marker-alt"></i>' + escapeHtml(String(r.address).slice(0,60)) + '</span>' : '');
-    } else {
-      // Google Maps — existing format
-      metaHtml =
-        (r.email_source === 'pending' ? '<span style="color:var(--muted)"><i class="fas fa-spinner fa-spin"></i> scraping...</span>' :
-         r.email_source === 'failed'  ? '<span style="color:var(--red)"><i class="fas fa-exclamation-triangle"></i>scrape failed</span>' :
-         r.email                       ? '<span><i class="fas fa-envelope"></i><span style="color:' + (r.email_source==='scraped'?'#34d399':'#fbbf24') + '">' + r.email + '</span>' + (r.email_source==='scraped'?' <span title="Real email found on website" style="color:#34d399;font-size:9px">✓ verified</span>':' <span title="Generated guess (info@domain)" style="color:#fbbf24;font-size:9px">⚠ guess</span>') + '</span>' :
-                                         '<span style="color:var(--red)"><i class="fas fa-envelope-open"></i>no email</span>') +
-        (r.phone   ? '<span><i class="fas fa-phone"></i>' + r.phone + '</span>' : '') +
-        (r.website ? '<span><i class="fas fa-globe"></i><a href="' + r.website + '" target="_blank" style="color:var(--accent2);text-decoration:none">' + webShort + '</a></span>' : '') +
-        (r.rating  ? '<span><i class="fas fa-star" style="color:#f59e0b"></i>' + r.rating + ' (' + r.reviews + ')</span>' : '') +
-        (r.address ? '<span><i class="fas fa-map-marker-alt"></i>' + escapeHtml(String(r.address).slice(0,60)) + '</span>' : '');
-    }
-
-    // Source badge
-    const srcBadge = isOS
-      ? '<span class="badge" style="background:#fb923c20;color:#fb923c;font-size:9px;margin-left:4px"><i class="fab fa-linkedin"></i> LinkedIn</span>'
-      : '<span class="badge" style="background:#3b82f620;color:#3b82f6;font-size:9px;margin-left:4px"><i class="fas fa-map-marked-alt"></i> Maps</span>';
-
-    // Right-side actions
-    const rightActions = isOS
-      ? (r.linkedinUrl ? '<a href="' + r.linkedinUrl + '" target="_blank" class="btn btn-outline btn-xs" title="Open LinkedIn"><i class="fab fa-linkedin"></i></a>' : '')
-      : (r.maps_url ? '<a href="' + r.maps_url + '" target="_blank" class="btn btn-outline btn-xs"><i class="fas fa-map"></i></a>' : '');
-
-    return '<div class="search-result ' + sel + ' ' + already + '" id="qsr-' + r.place_id + '"' +
-        (r.already_saved ? '' : ' onclick="qsCardClick(event, \'' + r.place_id + '\')" style="cursor:pointer"') + '>' +
-      '<input type="checkbox" style="width:20px;height:20px"' + (isSel?' checked':'') + (r.already_saved?' disabled':'') + ' onclick="event.stopPropagation()" onchange="qsToggle(\'' + r.place_id + '\', this)"/>' +
-      '<div class="sr-info">' +
-        '<div class="name">' + escapeHtml(r.name || '') + srcBadge + '</div>' +
-        '<div class="meta">' + metaHtml + '</div>' +
-      '</div>' +
-      '<div class="sr-actions">' +
-        (r.already_saved ? '<span class="badge badge-done">Already saved</span>' : '') +
-        rightActions +
-      '</div>' +
-    '</div>';
-    } catch (cardErr) {
-      // One bad card shouldn't kill the whole list — render a fallback
-      console.error('[renderQSResults] card '+idx+' threw:', cardErr, 'data:', r);
-      return '<div class="search-result" style="border-color:#ef4444"><div class="sr-info"><div class="name">⚠ Lead '+idx+' failed to render</div><div class="meta" style="color:#ef4444;font-size:11px">'+(cardErr.message||cardErr)+'</div></div></div>';
-    }
-  }).join('');
-  div.innerHTML = cardHtml;
-  updateQSCount();
-  console.log('[renderQSResults] rendered '+qsResults.length+' cards, innerHTML length='+div.innerHTML.length);
-  } catch (e) {
-    console.error('[renderQSResults] FATAL:', e);
-    div.innerHTML = '<div style="padding:20px;border:2px solid #ef4444;border-radius:8px;background:#fef2f2;color:#991b1b"><strong>⚠ Render error — please share this with support:</strong><br/><code style="font-size:11px;white-space:pre-wrap;display:block;margin-top:8px;background:white;padding:8px;border-radius:4px">'+(e.message||e)+'</code><br/><small>qsResults had '+qsResults.length+' items but rendering failed.</small></div>';
-  }
+  
+  div.innerHTML = parts.join('');
+  console.log('[renderQSResults] DONE. innerHTML length =', div.innerHTML.length, '| visible:', div.offsetHeight, 'px tall');
+  if (typeof updateQSCount === 'function') updateQSCount();
 }
 
 function qsToggle(pid, chk) {
