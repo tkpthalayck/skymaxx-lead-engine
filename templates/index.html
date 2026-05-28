@@ -1272,8 +1272,9 @@ function renderQSResults() {
       ? (r.linkedinUrl ? '<a href="' + r.linkedinUrl + '" target="_blank" class="btn btn-outline btn-xs" title="Open LinkedIn"><i class="fab fa-linkedin"></i></a>' : '')
       : (r.maps_url ? '<a href="' + r.maps_url + '" target="_blank" class="btn btn-outline btn-xs"><i class="fas fa-map"></i></a>' : '');
 
-    return '<div class="search-result ' + sel + ' ' + already + '" id="qsr-' + r.place_id + '">' +
-      '<input type="checkbox"' + (isSel?' checked':'') + (r.already_saved?' disabled':'') + ' onchange="qsToggle(\'' + r.place_id + '\', this)"/>' +
+    return '<div class="search-result ' + sel + ' ' + already + '" id="qsr-' + r.place_id + '"' +
+        (r.already_saved ? '' : ' onclick="qsCardClick(event, \'' + r.place_id + '\')" style="cursor:pointer"') + '>' +
+      '<input type="checkbox" style="width:20px;height:20px"' + (isSel?' checked':'') + (r.already_saved?' disabled':'') + ' onclick="event.stopPropagation()" onchange="qsToggle(\'' + r.place_id + '\', this)"/>' +
       '<div class="sr-info">' +
         '<div class="name">' + escapeHtml(r.name || '') + srcBadge + '</div>' +
         '<div class="meta">' + metaHtml + '</div>' +
@@ -1291,6 +1292,21 @@ function qsToggle(pid, chk) {
   if (chk.checked) qsSelected.add(pid); else qsSelected.delete(pid);
   const el = document.getElementById('qsr-' + pid);
   if (el) el.classList.toggle('selected', chk.checked);
+  updateQSCount();
+}
+
+function qsCardClick(event, pid) {
+  // Clicking anywhere on the card toggles selection (except links/buttons)
+  const tag = (event.target.tagName || '').toLowerCase();
+  if (tag === 'a' || tag === 'button' || tag === 'input' || event.target.closest('a,button')) return;
+  const willSelect = !qsSelected.has(pid);
+  if (willSelect) qsSelected.add(pid); else qsSelected.delete(pid);
+  const el = document.getElementById('qsr-' + pid);
+  if (el) {
+    el.classList.toggle('selected', willSelect);
+    const cb = el.querySelector('input[type=checkbox]');
+    if (cb) cb.checked = willSelect;
+  }
   updateQSCount();
 }
 
