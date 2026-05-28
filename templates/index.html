@@ -1224,12 +1224,19 @@ if (typeof qsSelected === 'undefined') { window.qsSelected = new Set(); }
 
 function renderQSResults() {
   const div = document.getElementById('qs-results');
-  if (!div) return;
+  if (!div) {
+    console.error('[renderQSResults] qs-results div NOT FOUND');
+    return;
+  }
+  // Visible debug banner so we can see what's happening
+  console.log('[renderQSResults] starting | qsResults.length=', qsResults ? qsResults.length : 'null');
   if (!qsResults || !qsResults.length) {
     div.innerHTML = '<div class="empty"><i class="fas fa-search"></i><p>No results</p></div>';
     updateQSCount(); return;
   }
-  div.innerHTML = qsResults.map((r, idx) => {
+  try {
+  const cardHtml = qsResults.map((r, idx) => {
+    try {
     const isSel    = qsSelected.has(r.place_id);
     const sel      = isSel ? 'selected' : '';
     const already  = r.already_saved ? 'already' : '';
@@ -1284,8 +1291,19 @@ function renderQSResults() {
         rightActions +
       '</div>' +
     '</div>';
+    } catch (cardErr) {
+      // One bad card shouldn't kill the whole list — render a fallback
+      console.error('[renderQSResults] card '+idx+' threw:', cardErr, 'data:', r);
+      return '<div class="search-result" style="border-color:#ef4444"><div class="sr-info"><div class="name">⚠ Lead '+idx+' failed to render</div><div class="meta" style="color:#ef4444;font-size:11px">'+(cardErr.message||cardErr)+'</div></div></div>';
+    }
   }).join('');
+  div.innerHTML = cardHtml;
   updateQSCount();
+  console.log('[renderQSResults] rendered '+qsResults.length+' cards, innerHTML length='+div.innerHTML.length);
+  } catch (e) {
+    console.error('[renderQSResults] FATAL:', e);
+    div.innerHTML = '<div style="padding:20px;border:2px solid #ef4444;border-radius:8px;background:#fef2f2;color:#991b1b"><strong>⚠ Render error — please share this with support:</strong><br/><code style="font-size:11px;white-space:pre-wrap;display:block;margin-top:8px;background:white;padding:8px;border-radius:4px">'+(e.message||e)+'</code><br/><small>qsResults had '+qsResults.length+' items but rendering failed.</small></div>';
+  }
 }
 
 function qsToggle(pid, chk) {
