@@ -1,16 +1,16 @@
-name: Live Check
-on: { push: { paths: ['live_check.py'] } }
+name: LiveCheck
+on: { workflow_dispatch: , push: { paths: ['live_check.py'] } }
 permissions: { contents: write }
 jobs:
   v:
     runs-on: ubuntu-latest
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - run: python3 live_check.py
       - if: always()
         run: |
-          git config user.email "bot@skymaxx.company"
-          git config user.name "Bot"
-          git add -f live_check.txt || true
-          git diff --staged --quiet || git commit -m "v [skip ci]"
+          git config user.email "b@s.c"; git config user.name "B"
+          git add -f live_check.txt 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "lc [skip ci]"
           git push || true
