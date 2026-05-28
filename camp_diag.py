@@ -1,110 +1,59 @@
 import urllib.request, json, time
-BASE = "https://skymaxx-lead-engine.onrender.com"
+BASE='https://skymaxx-lead-engine.onrender.com'
+out=[]
+def L(m): out.append(str(m)); print(m,flush=True)
 
-def post(p, body, timeout=70):
+def get(p,t=30):
     try:
-        req = urllib.request.Request(BASE+p,
-            data=json.dumps(body).encode(),
-            headers={"Content-Type":"application/json"},
-            method="POST")
-        r = urllib.request.urlopen(req, timeout=timeout)
-        return r.getcode(), json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        try: body = json.loads(e.read().decode())
-        except: body = {"raw": str(e)}
-        return e.code, body
-    except Exception as e:
-        return 0, {"error": str(e)[:300]}
+        r=urllib.request.urlopen(BASE+p,timeout=t); return r.getcode(), r.read().decode()
+    except urllib.error.HTTPError as e: return e.code, e.read().decode()[:500]
+    except Exception as e: return 0, str(e)[:200]
 
-def get(p):
-    try:
-        r = urllib.request.urlopen(BASE+p, timeout=30)
-        return r.getcode(), json.loads(r.read().decode())
-    except Exception as e:
-        return 0, {"error":str(e)[:200]}
-
-log = []
-log.append("=== CAMPAIGN CREATION FLOW DIAGNOSTIC ===")
-log.append("")
-
-# Step 1: Search
-log.append("STEP 1: Search")
-t0 = time.time()
-code, r = post("/api/search/v2/preview", {
-    "country": "United Arab Emirates",
-    "state":   "Dubai",
-    "category":"IT services company",
-})
-log.append(f"  HTTP {code} in {time.time()-t0:.1f}s")
-if code != 200:
-    log.append(f"  ERROR: {r}")
-    with open("camp_diag.txt","w") as f: f.write(chr(10).join(log))
-    exit()
-
-results = r["results"][:5]  # take first 5
-log.append(f"  Got {len(results)} leads (showing first 5)")
-for x in results:
-    log.append(f"  - {x.get("name","")[:30]} | email={x.get("email","NONE")[:40] or "NONE"} | website={bool(x.get("website"))}")
-
-# Step 2: Enrich first batch
-log.append("")
-log.append("STEP 2: Enrich emails (first 4)")
-batch = [{"place_id":x["place_id"], "website":x["website"]} for x in results[:4] if x.get("website")]
-t0 = time.time()
-code, r2 = post("/api/search/v2/enrich_emails", {"leads": batch})
-log.append(f"  HTTP {code} in {time.time()-t0:.1f}s")
-if code == 200:
-    emails = r2.get("emails", {})
-    log.append(f"  Got {len(emails)} email results")
-    for x in results[:4]:
-        em = emails.get(x["place_id"], {})
-        x["email"] = em.get("email","")
-        x["email_source"] = em.get("email_source","none")
-        x["has_email"] = em.get("has_email",False)
-        log.append(f"  - {x.get("name","")[:30]} -> {x.get("email") or "NONE"} ({x.get("email_source")})")
-
-# Step 3: Save selected leads (THIS IS THE CRITICAL STEP)
-log.append("")
-log.append("STEP 3: Save selected leads (with full lead objects)")
-selected = results[:3]  # take 3 with emails
-t0 = time.time()
-code, r3 = post("/api/search/v2/save_selected", {"leads": selected}, timeout=70)
-log.append(f"  HTTP {code} in {time.time()-t0:.1f}s")
-log.append(f"  Response: {r3}")
-
-lead_ids = []
-if code == 200:
-    lead_ids = r3.get("lead_ids", [])
-    log.append(f"  Saved {r3.get("saved",0)} leads, IDs: {lead_ids}")
-
-# Step 4: Create campaign draft (THE FINAL STEP)
-log.append("")
-log.append("STEP 4: Create campaign draft")
-if lead_ids:
-    t0 = time.time()
-    code, r4 = post("/api/campaigns/draft", {
-        "name": "Test Campaign " + str(int(time.time())),
-        "lead_ids": lead_ids
-    }, timeout=70)
-    log.append(f"  HTTP {code} in {time.time()-t0:.1f}s")
-    if code == 200:
-        log.append(f"  ✓ CAMPAIGN CREATED: id={r4.get("campaign_id")}, status={r4.get("status")}")
-        log.append(f"  Recipient count: {r4.get("recipient_count")}")
-        log.append(f"  Risk score: {r4.get("risk_score")}")
-    else:
-        log.append(f"  FAIL: {r4}")
+L('='*68)
+L('CAMPAIGN 1 DEEP DIAGNOSTIC')
+L('='*68)
+code, body = get('/api/debug/campaign/1')
+if code==200:
+    d=json.loads(body)
+    c=d.get('campaign',{})
+    L('Campaign status: '+str(c.get('status')))
+    L('actually_sent:   '+str(c.get('actually_sent')))
+    L('actually_failed: '+str(c.get('actually_failed')))
+    L('actually_replied:'+str(c.get('actually_replied')))
+    L('lead_ids count:  '+str(d.get('lead_ids_count')))
+    L('leads in_seq:    '+str(d.get('leads_in_sequence')))
+    L('')
+    L('PER-LEAD STATE (sequence_step + next_send_at):')
+    now = time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime())
+    L('  (current UTC: '+now+')')
+    L('')
+    due_now=0; future=0; done=0
+    for l in d.get('leads',[]):
+        step=l.get('sequence_step'); nsa=l.get('next_send_at'); inseq=l.get('in_sequence')
+        L('  id='+str(l.get('id')).ljust(3)+' step='+str(step)+
+          ' in_seq='+str(inseq)+' next_send='+str(nsa or 'NULL')[:19]+
+          ' replied='+str(l.get('replied')))
+        if not inseq: done+=1
+        elif nsa and str(nsa) > now: future+=1
+        else: due_now+=1
+    L('')
+    L('SUMMARY:')
+    L('  Due now (should send next cron): '+str(due_now))
+    L('  Scheduled future (waiting):      '+str(future))
+    L('  Finished/not in seq:             '+str(done))
 else:
-    log.append("  SKIPPED - no lead_ids from save step")
+    L('HTTP '+str(code)+': '+body[:300])
 
-# Step 5: List campaigns to verify
-log.append("")
-log.append("STEP 5: List campaigns")
-code, r5 = get("/api/campaigns")
-if code == 200:
-    cs = r5.get("campaigns", [])
-    log.append(f"  Total campaigns: {len(cs)}")
-    for c in cs[:5]:
-        log.append(f"  - id={c.get("id")} name={c.get("name","")[:40]} status={c.get("status")} recipients={c.get("recipient_count")}")
+# Also check the email log count
+L('')
+code, body = get('/api/log')
+if code==200:
+    d=json.loads(body)
+    log=d.get('log',[])
+    L('Email log total: '+str(len(log)))
+    by_step={}
+    for e in log:
+        s=e.get('step'); by_step[s]=by_step.get(s,0)+1
+    L('By step: '+str(by_step))
 
-with open("camp_diag.txt","w") as f: f.write(chr(10).join(log))
-print(chr(10).join(log))
+with open('camp_diag.txt','w') as f: f.write(chr(10).join(out))
