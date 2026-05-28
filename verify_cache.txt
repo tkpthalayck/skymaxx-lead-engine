@@ -1,0 +1,9 @@
+VERIFY no-cache + click-to-select
+==================================================
+Cache-Control header: no-cache, no-store, must-revalidate
+Pragma header:        no-cache
+
+qsCardClick defined:        NO
+card onclick wired:         NO
+bigger checkbox (20px):     NO
+checkbox stopPropagation:   NO
