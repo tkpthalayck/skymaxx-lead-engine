@@ -704,6 +704,17 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
 </div>
 
 <script>
+
+// Ensure all fetch() calls include the session cookie (defensive — fixes auth on older browsers)
+(function(){
+  const _origFetch = window.fetch;
+  window.fetch = function(url, opts) {
+    opts = opts || {};
+    if (!opts.credentials) opts.credentials = 'same-origin';
+    return _origFetch.call(this, url, opts);
+  };
+})();
+
 let citiesList = [];
 let selectedCategories = new Set();
 let selectedCities = new Set();
