@@ -1,0 +1,13 @@
+====================================================================
+VERIFICATION: createCampaign fix + draft endpoint
+====================================================================
+1. createCampaign() in served HTML: YES ✓
+   Broken buttons still call it:    YES (now wired)
+
+2. Testing /api/campaigns/draft with lead_ids=all...
+   HTTP 400
+   Response: no eligible leads selected
+   (NOTE: 0 eligible is EXPECTED — all 14 leads already enrolled in campaign 1)
+
+3. All campaigns:
+   id=1 "Outreach 5/25/2026" status=running sent=14/14
