@@ -1,16 +1,10 @@
-=== LIVE VERIFICATION ===
-PASS /api/locations/countries -> HTTP 200, 22 items
-PASS /api/locations/states/AE -> HTTP 200, 7 items
-PASS /api/locations/states/SA -> HTTP 200, 13 items
-PASS /api/business_categories -> HTTP 200, 30 items
-PASS /api/job_titles -> HTTP 200, 22 items
+Live HTML size: 119981
 
-HTML markers (proves new frontend deployed):
-PASS "B2B Prospect Discovery" in HTML
-PASS "qs-country" in HTML
-PASS "bulk-countries" in HTML
-PASS "quickSearchV2" in HTML
-PASS "initV2Search" in HTML
-PASS "Business Category" in HTML
-PASS "Job Title" in HTML
-PASS "State / Region" in HTML
+FIX MARKERS in LIVE served HTML:
+  createCampaign(mode) defined:     YES
+  qsToggle defined:                  YES
+  running badge:                     YES
+  sent-count display:                YES
+  Add to New Campaign button:        YES
+  pagination retry:                  N/A backend
+  qsToggle onchange wiring:          YES
