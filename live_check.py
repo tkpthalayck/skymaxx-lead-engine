@@ -1,31 +1,20 @@
 import urllib.request, json
-BASE = 'https://skymaxx-lead-engine.onrender.com'
-
-def get(p):
-    try:
-        r = urllib.request.urlopen(BASE+p, timeout=45)
-        return r.getcode(), r.read().decode()
-    except Exception as e:
-        return 0, str(e)[:80]
-
-log = []
-log.append('=== LIVE VERIFICATION ===')
-
-# Endpoints
-for ep in ['/api/locations/countries','/api/locations/states/AE','/api/locations/states/SA','/api/business_categories','/api/job_titles']:
-    code, body = get(ep)
-    if code == 200:
-        d = json.loads(body)
-        log.append('PASS ' + ep + ' -> HTTP 200, ' + str(len(d)) + ' items')
-    else:
-        log.append('FAIL ' + ep + ' -> HTTP ' + str(code) + ' | ' + body)
-
-# HTML markers
-code, html = get('/')
-log.append('')
-log.append('HTML markers (proves new frontend deployed):')
-for m in ['B2B Prospect Discovery','qs-country','bulk-countries','quickSearchV2','initV2Search','Business Category','Job Title','State / Region']:
-    log.append(('PASS' if m in html else 'FAIL') + ' "' + m + '" ' + ('in HTML' if m in html else 'NOT in HTML'))
-
-with open('live_check.txt','w') as f: f.write(chr(10).join(log))
-print(chr(10).join(log))
+BASE='https://skymaxx-lead-engine.onrender.com'
+out=[]
+def L(m): out.append(str(m)); print(m,flush=True)
+try:
+    html = urllib.request.urlopen(BASE+'/', timeout=40).read().decode()
+    L('Live HTML size: '+str(len(html)))
+    L('')
+    L('FIX MARKERS in LIVE served HTML:')
+    L('  createCampaign(mode) defined:     '+('YES' if 'async function createCampaign(mode)' in html else 'NO  <-- STALE DEPLOY'))
+    L('  qsToggle defined:                  '+('YES' if 'function qsToggle(' in html else 'NO'))
+    L('  running badge:                     '+('YES' if 'Running</span>' in html else 'NO'))
+    L('  sent-count display:                '+('YES' if 'actually_sent || 0' in html else 'NO'))
+    L('  Add to New Campaign button:        '+('YES' if 'Add to New Campaign' in html else 'NO'))
+    L('  pagination retry:                  '+('YES' if 'next_page_token' in html or 'pagetoken' in html else 'N/A backend'))
+    # Check the qsToggle onchange wiring is present in render
+    L('  qsToggle onchange wiring:          '+('YES' if 'onchange=' in html and 'qsToggle' in html else 'NO'))
+except Exception as e:
+    L('ERR: '+str(e))
+with open('live_check.txt','w') as f: f.write(chr(10).join(out))
