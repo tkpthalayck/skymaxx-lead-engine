@@ -897,8 +897,8 @@ def _places_text_search_paginated(query, max_pages=3, max_results=60):
             # Google's next_page_token needs a few seconds to activate.
             # Retry with backoff if we get INVALID_REQUEST.
             resp = None
-            for attempt in range(4):
-                time.sleep(2 + attempt)  # 2s, 3s, 4s, 5s
+            for attempt in range(2):
+                time.sleep(2 + attempt)  # 2s, 3s (keep search fast)
                 try:
                     resp = requests.get(PLACES_TEXT_URL, params={
                         "key": GOOGLE_MAPS_API_KEY, "pagetoken": next_token
@@ -2954,7 +2954,7 @@ def search_v2_preview():
 
     # Paginated fetch: up to 60 results via 3-page sweep (Google Maps Text Search limit)
     try:
-        places_raw = _places_text_search_paginated(query, max_pages=3, max_results=60)
+        places_raw = _places_text_search_paginated(query, max_pages=2, max_results=40)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     if not places_raw:
