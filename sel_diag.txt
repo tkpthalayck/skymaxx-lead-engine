@@ -1,0 +1,22 @@
+SEARCH-RESULT SELECTION DIAGNOSTIC
+=======================================================
+Results: 20
+Flagged already_saved (checkbox DISABLED): 0 / 20
+  None disabled — checkboxes should all be clickable
+
+place_id format check (special chars break onclick):
+  pid=ChIJ_ZBtEgddXz4RzPOmZCd43tY
+  pid=ChIJaXD6hc9pXz4RLmQrkyV2LG4
+  pid=ChIJ2f2RgBZDXz4RWRS1nhL8TK0
+  pid=ChIJIYY3xUtDXz4ROAJ5ZjPuIvE
+  pid=ChIJX7HcynGcdIsRJlNlbk2wOLE
+  pid=ChIJv4cSPll172oR-SUcuc_V6b8
+  pid=ChIJ82L4y8xDXz4RdklqnwEiKxo
+  pid=ChIJmVvgN91DXz4Rd0XqO1t52Dw
+  pid=ChIJ20f8JIxtXz4RIH89n0RtCDU
+  pid=ChIJXXcbeq1DXz4R28EpfQ15b1s
+
+place_ids with special chars: 0
+
+Sample result keys: ['address', 'already_saved', 'category', 'city', 'country', 'email', 'email_source', 'has_email', 'maps_url', 'name', 'phone', 'place_id', 'rating', 'reviews', 'website']
+  already_saved value: False
