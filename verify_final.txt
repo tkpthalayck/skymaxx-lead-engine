@@ -1,0 +1,23 @@
+FINAL VERIFY: ALL API responses are JSON, never HTML
+=======================================================
+
+1. /api/stats WITHOUT auth
+  HTTP 401 Content-Type: application/json
+  Body is JSON: YES ✓
+  Body: {"error":"unauthorized","login_url":"/login"}
+
+
+2. Login
+  HTTP 200 → https://skymaxx-lead-engine.onrender.com/
+
+3. Search WITH auth
+  HTTP 200 Content-Type: application/json
+  Results: 20
+
+4. /api/nonexistent (test 404 handler)
+  HTTP 404 Content-Type: application/json
+  Body is JSON: YES ✓
+
+5. Bulletproof fetch wrapper in served HTML
+  Session-expired handler: YES ✓
+  401 auto-redirect:       YES ✓
