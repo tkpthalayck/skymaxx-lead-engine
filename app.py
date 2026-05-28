@@ -889,20 +889,38 @@ def update_campaign_counters(campaign_id=None):
 def _places_text_search_paginated(query, max_pages=3, max_results=60):
     """Fetch Google Maps Text Search results across multiple pages.
     Returns up to `max_results` combined results from up to `max_pages` pages.
-    Each page yields up to 20 results; token activation requires 2s delay."""
+    Handles Google's next_page_token activation delay with retries."""
     all_results = []
     next_token = None
     for page_num in range(max_pages):
         if next_token:
-            params = {"key": GOOGLE_MAPS_API_KEY, "pagetoken": next_token}
-            time.sleep(2)  # Google requires ~2s for next_page_token to activate
+            # Google's next_page_token needs a few seconds to activate.
+            # Retry with backoff if we get INVALID_REQUEST.
+            resp = None
+            for attempt in range(4):
+                time.sleep(2 + attempt)  # 2s, 3s, 4s, 5s
+                try:
+                    resp = requests.get(PLACES_TEXT_URL, params={
+                        "key": GOOGLE_MAPS_API_KEY, "pagetoken": next_token
+                    }, timeout=15).json()
+                except Exception as e:
+                    print(f"[places_paginated] page {page_num+1} attempt {attempt+1}: {e}")
+                    continue
+                status = resp.get("status")
+                if status == "INVALID_REQUEST":
+                    # token not ready yet — retry
+                    continue
+                break
+            if resp is None:
+                break
         else:
-            params = {"key": GOOGLE_MAPS_API_KEY, "query": query}
-        try:
-            resp = requests.get(PLACES_TEXT_URL, params=params, timeout=15).json()
-        except Exception as e:
-            print(f"[places_paginated] page {page_num+1}: {e}")
-            break
+            try:
+                resp = requests.get(PLACES_TEXT_URL, params={
+                    "key": GOOGLE_MAPS_API_KEY, "query": query
+                }, timeout=15).json()
+            except Exception as e:
+                print(f"[places_paginated] page 1: {e}")
+                break
         if resp.get("status") not in ("OK", "ZERO_RESULTS"):
             print(f"[places_paginated] page {page_num+1} status={resp.get('status')}")
             break
