@@ -20,7 +20,16 @@ import secrets as _secrets
 from functools import wraps as _wraps
 
 # Session secret (random fallback if env not set — sessions invalidate on restart, which is fine)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY") or _secrets.token_hex(32)
+# Stable fallback secret — sessions survive Render free-tier cold starts.
+# Strongly recommended: set FLASK_SECRET_KEY env var in Render for production.
+app.secret_key = os.environ.get("FLASK_SECRET_KEY") or "skx-stable-7b3f2e8c4a91d6f0e5a8b2c7d4e9f1a3"
+
+# Session config
+from datetime import timedelta as _td
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SECURE"]   = True  # HTTPS only (Render is always HTTPS)
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["PERMANENT_SESSION_LIFETIME"] = _td(days=30)
 
 # Credentials from env vars (with a default that DEMANDS to be changed)
 AUTH_USER     = os.environ.get("SKYMAXX_AUTH_USER", "admin")
