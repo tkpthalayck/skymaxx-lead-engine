@@ -1,70 +1,66 @@
+import urllib.request, json
+BASE='https://skymaxx-lead-engine.onrender.com'
+out=[]
+def L(m): out.append(str(m)); print(m,flush=True)
+def get(p,t=30):
+    try:
+        r=urllib.request.urlopen(BASE+p,timeout=t); return r.getcode(), r.read().decode()
+    except urllib.error.HTTPError as e: return e.code, e.read().decode()[:500]
+    except Exception as e: return 0, str(e)[:200]
 
-import urllib.request, json, time
+L('='*68)
+L('FINAL VERIFICATION — all reported issues')
+L('='*68)
 
-BASE = "https://skymaxx-lead-engine.onrender.com"
-log = []
-def L(m): log.append(m); print(m, flush=True)
+# 1. createCampaign present
+code, html = get('/')
+L('')
+L('ISSUE 1: Lead selection → Campaign')
+L('  createCampaign() defined:        ' + ('YES ✓' if 'async function createCampaign(mode)' in html else 'NO ✗'))
+L('  Campaign Selected button wired:  ' + ('YES ✓' if "createCampaign('selected')" in html else 'NO'))
+L('  Campaign All Eligible wired:     ' + ('YES ✓' if "createCampaign('all')" in html else 'NO'))
 
-L("=== AFTER PYTHON 3.12 PIN — DEBUG STATE ===")
-L("")
+# 2. Campaign display fixes
+L('')
+L('ISSUE 2: Campaign "running but not working"')
+L('  running badge present:           ' + ('YES ✓' if 'running:' in html and 'Running</span>' in html else 'NO'))
+L('  running shows pause/stop:         ' + ('YES ✓' if "c.status === 'running'" in html else 'NO'))
+L('  sent-count display:               ' + ('YES ✓' if 'actually_sent || 0' in html else 'NO'))
+
+# 3. Campaign API enrichment
+code, body = get('/api/campaigns')
+if code==200:
+    camps = json.loads(body).get('campaigns',[])
+    L('')
+    L('  Live campaign data:')
+    for c in camps:
+        L('    "'+str(c.get('name'))[:28]+'"')
+        L('      status:        '+str(c.get('status')))
+        L('      actually_sent: '+str(c.get('actually_sent'))+'/'+str(c.get('recipient_count')))
+        L('      next_send_at:  '+str(c.get('next_send_at')))
+        L('      progress:      '+str(c.get('leads_finished'))+'/'+str(c.get('leads_total'))+' finished')
+
+# 4. Pagination check (Task 4 from before)
+L('')
+L('ISSUE 3 (earlier): Lead search 100+')
+L('  Pagination helper deployed:      checking via search test...')
+import json as j
+req=urllib.request.Request(BASE+'/api/search/v2/preview',
+    data=j.dumps({'source':'google_maps','country':'AE','state':'Dubai','category':'restaurant'}).encode(),
+    headers={'Content-Type':'application/json'},method='POST')
 try:
-    r = urllib.request.urlopen(BASE + "/api/debug/db", timeout=45)
-    info = json.loads(r.read().decode())
-    for k, v in info.items():
-        L("  " + str(k) + ": " + str(v)[:200])
+    r=urllib.request.urlopen(req,timeout=60); d=j.loads(r.read())
+    L('  Search returned:                 '+str(d.get('found') or len(d.get('results',[])))+' leads (cap now 60)')
 except Exception as e:
-    L("Error: " + str(e))
+    L('  Search test: '+str(e)[:100])
 
-# If USE_POSTGRES is True now, re-import leads and we are done
-L("")
-L("=== RE-IMPORT LEADS (FINAL) ===")
-leads = [
-    ("Aaron Barak", "abarak@maximaapparel.com", "COO", "Maxima Apparel"),
-    ("Chris Kucharski", "chris.kucharski@onerail.io", "CTO", "OneRail"),
-    ("Hank Jackson", "hank.jackson@edgewaterit.com", "COO", "Edgewater"),
-    ("James Stanford", "james.stanford@edgewaterit.com", "Sr Director", "Edgewater"),
-    ("Raymond Churgovich", "rchurgovich@broomfield.org", "IT PM", "Edgewater"),
-    ("Tom Monahan", "tom.monahan@edgewaterit.com", "IT Manager", "Edgewater"),
-    ("Michael Hinman", "michael.hinman@edgewaterit.com", "IT PM", "Edgewater"),
-    ("Dan Aldis", "daldis@halvik.com", "IT Program Manager", "Halvik"),
-    ("Liam Connor", "liam.connor@intercity.technology", "Tech Services Mgr", "Intercity"),
-    ("Mark Hawkins-Wood", "mark.hawkins-wood@intercity.technology", "Head of Cloud", "Intercity"),
-    ("Stewart Nicol", "stewart.nicol@intercity.technology", "Head of Platforms", "Intercity"),
-    ("Rick Korsak", "rick.korsak@intercity.technology", "IT Infra Mgr", "Intercity"),
-    ("Ampem Dako", "ampem.dako@intercity.technology", "Managed IT Mgr", "Intercity"),
-]
-csv_data = "name,email,title,company,city,country" + chr(10)
-for name, email, title, company in leads:
-    csv_data += name + "," + email + "," + title + "," + company + ",," + chr(10)
+# 5. Cron health
+L('')
+L('ISSUE 4 (earlier): Email automation')
+code, body = get('/api/stats')
+if code==200:
+    s=json.loads(body)
+    L('  total_sent:   '+str(s.get('total_sent')))
+    L('  in_sequence:  '+str(s.get('in_sequence')))
 
-boundary = "------brk998877"
-body_bytes = (
-    "--" + boundary + chr(13) + chr(10) +
-    "Content-Disposition: form-data; name=" + chr(34) + "file" + chr(34) + "; filename=" + chr(34) + "m.csv" + chr(34) + chr(13) + chr(10) +
-    "Content-Type: text/csv" + chr(13) + chr(10) + chr(13) + chr(10) +
-    csv_data + chr(13) + chr(10) +
-    "--" + boundary + "--" + chr(13) + chr(10)
-).encode("utf-8")
-
-req = urllib.request.Request(BASE + "/api/import", data=body_bytes,
-    headers={"Content-Type": "multipart/form-data; boundary=" + boundary}, method="POST")
-try:
-    r = urllib.request.urlopen(req, timeout=60)
-    L("Import: " + r.read().decode())
-except urllib.error.HTTPError as e:
-    L("HTTPError " + str(e.code) + ": " + e.read().decode()[:300])
-except Exception as e:
-    L("Error: " + str(e))
-
-L("")
-L("=== FINAL LEAD COUNT ===")
-try:
-    r = urllib.request.urlopen(BASE + "/api/leads?per_page=20", timeout=30)
-    d = json.loads(r.read().decode())
-    L("Total: " + str(d.get("total", 0)))
-    for l in d.get("leads", [])[:15]:
-        L("  - id=" + str(l.get("id")) + " | " + str(l.get("name",""))[:30] + " | " + str(l.get("email",""))[:40])
-except Exception as e:
-    L("Error: " + str(e))
-
-open("final_verify.txt","w").write(chr(10).join(log))
+with open('final_verify.txt','w') as f: f.write(chr(10).join(out))
