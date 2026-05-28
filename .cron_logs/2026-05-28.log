@@ -1,0 +1,1 @@
+2026-05-28T00:11:18Z | HTTP 200 | {"campaigns_updated":true,"completed_at":"2026-05-28T00:11:18.621439","ok":true,"replies":{"error":null,"processed":1},"sends":{"after_pending":0,"before_pending":0,"error":null,"sent_this_run":0},"started_at":"2026-05-28T00:11:17.055472"}
