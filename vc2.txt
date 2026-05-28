@@ -1,0 +1,5 @@
+LIVE served HTML:
+  qsCardClick defined:  YES
+  card onclick wired:   YES
+  bigger checkbox:      YES
+  Cache-Control:        no-cache, no-store, must-revalidate
