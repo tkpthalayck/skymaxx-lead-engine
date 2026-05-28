@@ -645,7 +645,7 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
       <div class="card">
         <div class="card-title"><i class="fas fa-rocket"></i> All Campaigns <button class="btn btn-outline btn-sm ml-auto" onclick="loadCampaigns()"><i class="fas fa-sync"></i> Refresh</button></div>
         <div style="overflow-x:auto"><table>
-          <thead><tr><th>Name</th><th>Status</th><th>Recipients</th><th>Risk</th><th>Est. Replies</th><th>Created</th><th>Action</th></tr></thead>
+          <thead><tr><th>Name</th><th>Status</th><th>Sent / Total</th><th>Risk</th><th>Est. Replies</th><th>Created</th><th>Action</th></tr></thead>
           <tbody id="campaigns-tb"><tr><td colspan="7"><div class="empty"><i class="fas fa-rocket"></i><p>No campaigns yet — create one from "All Leads" tab</p></div></td></tr></tbody>
         </table></div>
       </div>
@@ -1895,8 +1895,12 @@ async function loadCampaigns() {
   const sb = {
     pending_approval: '<span class="badge badge-seq">⏸ Pending Approval</span>',
     approved:         '<span class="badge badge-replied">▶ Active</span>',
+    running:          '<span class="badge badge-replied">▶ Running</span>',
+    scheduled:        '<span class="badge badge-seq">🕐 Scheduled</span>',
     paused:           '<span class="badge badge-seq">⏸ Paused</span>',
     stopped:          '<span class="badge badge-failed">■ Stopped</span>',
+    cancelled:        '<span class="badge badge-failed">✗ Cancelled</span>',
+    failed:           '<span class="badge badge-failed">⚠ Failed</span>',
     rejected:         '<span class="badge badge-failed">✗ Rejected</span>',
     draft:            '<span class="badge badge-new">📝 Draft</span>',
     completed:        '<span class="badge badge-done">✓ Completed</span>',
@@ -1905,7 +1909,7 @@ async function loadCampaigns() {
     let actions = '';
     if (c.status === 'pending_approval') {
       actions = '<button class="btn btn-purple btn-xs" onclick="reopenApproval(' + c.id + ')"><i class="fas fa-eye"></i> Review &amp; Approve</button>';
-    } else if (c.status === 'approved') {
+    } else if (c.status === 'approved' || c.status === 'running' || c.status === 'scheduled') {
       actions = '<button class="btn btn-outline btn-xs" onclick="campaignPause(' + c.id + ')"><i class="fas fa-pause"></i> Pause</button> ' +
                 '<button class="btn btn-danger btn-xs" onclick="campaignStop(' + c.id + ')"><i class="fas fa-stop"></i> Stop</button>';
     } else if (c.status === 'paused') {
@@ -1915,7 +1919,9 @@ async function loadCampaigns() {
     return '<tr>' +
       '<td><strong>' + escapeHtml(c.name) + '</strong><br/><span style="font-size:11px;color:var(--muted)">' + escapeHtml((c.summary || '').slice(0, 80)) + '</span></td>' +
       '<td>' + (sb[c.status] || c.status) + '</td>' +
-      '<td>' + c.recipient_count + '</td>' +
+      '<td>' + (c.actually_sent || 0) + '/' + c.recipient_count +
+        (c.next_send_at ? '<br/><span style="font-size:10px;color:var(--accent)">next: ' + new Date(c.next_send_at + 'Z').toLocaleDateString() + '</span>' : '') +
+        '</td>' +
       '<td>' + c.risk_score + '/100</td>' +
       '<td>~' + Math.round((c.recipient_count * (c.est_reply_rate || 0)) / 100) + '</td>' +
       '<td style="font-size:11px;color:var(--muted)">' + new Date(c.created_at).toLocaleString() + '</td>' +
