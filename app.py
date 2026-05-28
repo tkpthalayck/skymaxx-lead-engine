@@ -2583,10 +2583,16 @@ def resume_campaign(cid):
     lead_ids = json.loads(camp["lead_ids_json"])
     placeholders = ",".join("?" * len(lead_ids)) if lead_ids else "NULL"
     if lead_ids:
-        conn.execute(f"""UPDATE leads SET in_sequence=1, next_send_at=?
+        # Preserve future next_send_at (don't blast everyone immediately on resume).
+        # Only set to now for leads whose next_send_at is NULL or already past.
+        now_iso = datetime.utcnow().isoformat()
+        conn.execute(f"""UPDATE leads SET in_sequence=1,
+            next_send_at = CASE
+                WHEN next_send_at IS NULL OR next_send_at < ? THEN ?
+                ELSE next_send_at END
             WHERE id IN ({placeholders}) AND sequence_step<5 AND replied=0 AND unsubscribed=0""",
-            [datetime.utcnow().isoformat()] + lead_ids)
-    conn.execute("UPDATE campaigns SET status='approved' WHERE id=?", [cid])
+            [now_iso, now_iso] + lead_ids)
+    conn.execute("UPDATE campaigns SET status='running' WHERE id=?", [cid])
     conn.commit(); conn.close()
     return jsonify({"resumed": True})
 
