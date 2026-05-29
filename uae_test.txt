@@ -1,17 +1,29 @@
-=================================================================
-UAE MANUFACTURING SEARCH — VERIFY EMAIL + PHONE ENRICHMENT
-=================================================================
-Login OK
-Search HTTP 200 (1.0s)
-Total results: 1
 
-  Has email:      0/1 (0 scraped + 0 generated@domain)
-  Has phone:      1/1
-  Has website:    1/1
+Query: {"source": "google_maps", "country": "AE", "category": "manufacturing"}
+  HTTP 502: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>502</title>
+    <style>@font-face {
+  font-fami
 
-Sample (first 10):
------------------------------------------------------------------
-   1. A E Manufacturing             
-      email:                                                 [pending]
-      phone:   041 463 3320             
-      website: http://www.aem.co.za/
+Query: {"source": "google_maps", "country": "AE", "category": "manufacturer", "state": "Dubai"}
+  HTTP 502: 
+
+Query: {"source": "google_maps", "country": "AE", "state": "Dubai", "keyword": "manufacturing companies"}
+  HTTP 502: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>502</title>
+    <style>@font-face {
+  font-fami
+
+Query: {"source": "google_maps", "country": "AE", "state": "Dubai", "keyword": "factory"}
+  HTTP 502: 
+
+Query: {"source": "google_maps", "country": "United Arab Emirates", "keyword": "manufacturer"}
+  HTTP 502: 
