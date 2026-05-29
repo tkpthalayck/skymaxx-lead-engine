@@ -3192,7 +3192,7 @@ def search_v2_preview():
                 return r  # nothing to enrich
             
             # Scrape both emails and phones in one website visit
-            contacts = scrape_contacts_from_website(website, per_url_timeout=4)
+            contacts = scrape_contacts_from_website(website, per_url_timeout=2)
             
             # Fill email if missing
             if not already_has_email:
@@ -3222,12 +3222,27 @@ def search_v2_preview():
             print(f"[enrich] err on {r.get('name','?')}: {e}")
         return r
 
-    # Run enrichment in parallel — cap to 30 to stay within Render's 30s budget
+    # Run enrichment in parallel with strict time budget (Render has 30s HTTP limit)
     if results:
-        enrich_cap = min(30, len(results))
+        import time as _t
+        from concurrent.futures import as_completed as _as_completed
+        enrich_cap = min(15, len(results))  # cap at 15 to fit in time budget
+        enrich_budget = 18.0  # seconds — leave headroom for Google Maps detail (5-8s) + response (2s)
+        _enrich_start = _t.time()
         with ThreadPoolExecutor(max_workers=10) as pool:
-            enriched = list(pool.map(_enrich_lead, results[:enrich_cap]))
-        results = enriched + results[enrich_cap:]
+            futures = [pool.submit(_enrich_lead, r) for r in results[:enrich_cap]]
+            for fut in _as_completed(futures, timeout=enrich_budget):
+                try:
+                    fut.result(timeout=1)
+                except Exception as fe:
+                    print(f"[enrich] future err: {fe}")
+                if _t.time() - _enrich_start > enrich_budget:
+                    # Cancel remaining
+                    for f in futures:
+                        if not f.done():
+                            f.cancel()
+                    break
+        # Lead dicts mutated in place; results already reflects enrichment
 
     # Mark already-saved
     if results:
@@ -3668,14 +3683,14 @@ def scrape_emails_from_website(website, per_url_timeout=4):
 
 
 
-def scrape_contacts_from_website(website, per_url_timeout=4):
+def scrape_contacts_from_website(website, per_url_timeout=2):
     """Visit homepage + /contact + /about. Returns {emails: [...], phones: [...]}."""
     if not website:
         return {'emails': [], 'phones': []}
     if not website.startswith(('http://', 'https://')):
         website = 'https://' + website
     base = website.rstrip('/')
-    urls = [base, base + '/contact', base + '/contact-us', base + '/about']
+    urls = [base, base + '/contact']  # just 2 URLs for speed
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
@@ -3684,7 +3699,7 @@ def scrape_contacts_from_website(website, per_url_timeout=4):
     }
     all_emails = []
     all_phones = []
-    MAX_BYTES = 250_000
+    MAX_BYTES = 100_000  # cap page size for speed
     for url in urls:
         try:
             r = requests.get(url, timeout=per_url_timeout, headers=headers, allow_redirects=True, verify=False, stream=True)
