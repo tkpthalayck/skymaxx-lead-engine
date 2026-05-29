@@ -2325,10 +2325,50 @@ def list_campaigns():
                 lead_ids).fetchone()[0]
             c["leads_finished"] = finished
             c["leads_total"] = len(lead_ids)
+            
+            # Per-step progress: sent count for each of the 5 steps
+            step_progress = []
+            for step_num in range(1, 6):
+                sent_at_step = conn.execute(
+                    f"""SELECT COUNT(*) FROM email_log
+                        WHERE lead_id IN ({ph}) AND step=? AND status='success'""",
+                    lead_ids + [step_num]).fetchone()[0]
+                # Get template name + delay for this step
+                try:
+                    tpl = SEQUENCE_TEMPLATES[step_num - 1]
+                    step_name = tpl.get('name', f'Email {step_num}')
+                except Exception:
+                    step_name = f'Email {step_num}'
+                # Status: completed (all sent), active (some sent or due now), pending (nothing yet)
+                if sent_at_step >= len(lead_ids):
+                    status = 'completed'
+                elif sent_at_step > 0:
+                    status = 'active'
+                else:
+                    # Pending — but is it the NEXT step to send?
+                    prev_sent = conn.execute(
+                        f"""SELECT COUNT(*) FROM email_log
+                            WHERE lead_id IN ({ph}) AND step=? AND status='success'""",
+                        lead_ids + [step_num - 1] if step_num > 1 else lead_ids + [0]).fetchone()[0]
+                    if step_num == 1:
+                        status = 'pending'
+                    elif prev_sent > 0 and sent_at_step == 0:
+                        status = 'next'  # this step is about to start
+                    else:
+                        status = 'pending'
+                step_progress.append({
+                    'step': step_num,
+                    'name': step_name,
+                    'sent': sent_at_step,
+                    'total': len(lead_ids),
+                    'status': status
+                })
+            c["step_progress"] = step_progress
         else:
             c["next_send_at"] = None
             c["leads_finished"] = 0
             c["leads_total"] = 0
+            c["step_progress"] = []
     conn.close()
     return jsonify({"campaigns": rows})
 
