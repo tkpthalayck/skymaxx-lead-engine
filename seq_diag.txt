@@ -1,0 +1,45 @@
+=================================================================
+SEQUENCE PROCESSING DIAGNOSTIC
+=================================================================
+
+1. CAMPAIGNS
+-----------------------------------------------------------------
+  ID=3 | Outreach 5/29/2026                       | status=running      | sent=5/? | next_send=2026-06-01T13:06:16
+  ID=1 | Outreach 5/25/2026                       | status=running      | sent=14/? | next_send=2026-05-30T02:40:25
+
+2. CAMPAIGN 1 LEAD STATES
+-----------------------------------------------------------------
+  Campaign: Outreach 5/25/2026
+  Status: running
+  Leads in campaign: 0
+
+
+3. RECENT EMAIL LOG (last 20)
+-----------------------------------------------------------------
+  HTTP 404
+
+4. MANUAL CRON TRIGGER
+-----------------------------------------------------------------
+  HTTP 200
+  Report: {
+  "campaigns_updated": true,
+  "completed_at": "2026-05-29T13:09:09.701371",
+  "ok": true,
+  "replies": {
+    "error": null,
+    "processed": 1
+  },
+  "sends": {
+    "after_pending": 0,
+    "before_pending": 0,
+    "error": null,
+    "sent_this_run": 0
+  },
+  "started_at": "2026-05-29T13:09:07.783429"
+}
+
+5. EMAIL LOG AFTER CRON RUN
+-----------------------------------------------------------------
+  ERR: HTTP Error 404: Not Found
+
+UTC now: 2026-05-29T13:09:09.842414
