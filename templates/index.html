@@ -1293,6 +1293,39 @@ function renderQSResults() {
   try {
     div.innerHTML = html_parts.join("");
     console.log("[render] OK: " + qsResults.length + " cards, innerHTML=" + div.innerHTML.length + " chars, visible height=" + div.offsetHeight + "px");
+
+    // *** CRITICAL FIX: cards are in DOM but parent container is hidden (offsetHeight=0).
+    // Walk up the ancestor chain and force-show any hidden parent. ***
+    if (div.offsetHeight === 0) {
+      console.warn("[render] container has 0 height — fixing hidden ancestors");
+      var fixedNodes = [];
+      var node = div;
+      while (node && node.tagName !== "BODY" && node.tagName !== "HTML") {
+        var cs = window.getComputedStyle(node);
+        var changed = false;
+        if (cs.display === "none") {
+          node.style.setProperty("display", "block", "important");
+          changed = true;
+        }
+        if (cs.visibility === "hidden") {
+          node.style.setProperty("visibility", "visible", "important");
+          changed = true;
+        }
+        if (parseFloat(cs.height) === 0 && cs.overflow === "hidden") {
+          node.style.setProperty("height", "auto", "important");
+          node.style.setProperty("max-height", "none", "important");
+          changed = true;
+        }
+        if (parseFloat(cs.maxHeight) === 0) {
+          node.style.setProperty("max-height", "none", "important");
+          changed = true;
+        }
+        if (changed) fixedNodes.push((node.id || node.className || node.tagName) + " (was " + cs.display + ", h=" + cs.height + ")");
+        node = node.parentElement;
+      }
+      console.log("[render] forced visible:", fixedNodes.length ? fixedNodes.join(" | ") : "none found");
+      console.log("[render] after fix, visible height =", div.offsetHeight, "px");
+    }
   } catch (e) {
     div.innerHTML = '<div style="background:#fee;border:2px solid red;padding:15px;border-radius:8px"><b>RENDER ERROR:</b><br/>' + String(e) + '<br/><br/>qsResults had ' + qsResults.length + ' items.</div>';
     console.error("[render] FAILED:", e);
