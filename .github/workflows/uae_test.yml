@@ -1,0 +1,16 @@
+name: UAETest
+on: { workflow_dispatch: , push: { paths: ['uae_test.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 uae_test.py
+        continue-on-error: true
+      - run: |
+          git config user.email "b@s.c"; git config user.name "B"
+          git add -f uae_test.txt 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "ut [skip ci]"
+          git push || true
