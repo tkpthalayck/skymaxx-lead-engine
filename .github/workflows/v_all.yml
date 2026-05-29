@@ -1,0 +1,16 @@
+name: VerifyAll
+on: { workflow_dispatch: , push: { paths: ['verify_all.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 verify_all.py
+        continue-on-error: true
+      - run: |
+          git config user.email "b@s.c"; git config user.name "B"
+          git add -f verify_all.txt 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "va [skip ci]"
+          git push || true
