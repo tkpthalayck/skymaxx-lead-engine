@@ -1225,6 +1225,33 @@ function escapeHtml(s) {
 if (typeof qsResults === 'undefined') { window.qsResults = []; }
 if (typeof qsSelected === 'undefined') { window.qsSelected = new Set(); }
 
+
+// Render step-by-step progress for a campaign (called from campaign card)
+function renderStepProgress(steps) {
+  if (!steps || !steps.length) return '';
+  var html = '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">';
+  for (var i = 0; i < steps.length; i++) {
+    var s = steps[i];
+    var icon, bg, color, label;
+    if (s.status === 'completed') {
+      icon = '✓'; bg = '#dcfce7'; color = '#166534'; label = 'Done';
+    } else if (s.status === 'active') {
+      icon = '→'; bg = '#dbeafe'; color = '#1e40af'; label = 'Active';
+    } else if (s.status === 'next') {
+      icon = '⏰'; bg = '#fef3c7'; color = '#92400e'; label = 'Next';
+    } else {
+      icon = '⏳'; bg = '#f1f5f9'; color = '#64748b'; label = 'Pending';
+    }
+    html += '<div title="' + (s.name || 'Email ' + s.step) + ' — ' + label + '" style="background:' + bg + ';color:' + color + ';padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,.05)">';
+    html += '<span style="font-size:13px">' + icon + '</span>';
+    html += '<span>Step ' + s.step + '</span>';
+    html += '<span style="opacity:.7;font-weight:500">' + s.sent + '/' + s.total + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function renderQSResults() {
   var div = document.getElementById('qs-results');
   if (!div) {
