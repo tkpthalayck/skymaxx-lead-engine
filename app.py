@@ -3179,6 +3179,56 @@ def search_v2_preview():
             "email_source": "pending" if website else "none",
         })
 
+    # ─── INLINE EMAIL + PHONE ENRICHMENT (parallel website scraping) ───
+    def _enrich_lead(r):
+        try:
+            website = (r.get('website') or '').strip()
+            already_has_email = bool(r.get('email'))
+            already_has_phone = bool(r.get('phone'))
+            if not website:
+                r['email_source'] = 'none'
+                return r
+            if already_has_email and already_has_phone:
+                return r  # nothing to enrich
+            
+            # Scrape both emails and phones in one website visit
+            contacts = scrape_contacts_from_website(website, per_url_timeout=4)
+            
+            # Fill email if missing
+            if not already_has_email:
+                domain = website.replace('https://', '').replace('http://', '').split('/')[0]
+                if domain.startswith('www.'):
+                    domain = domain[4:]
+                try:
+                    best = _pick_best_email(contacts.get('emails', []), target_domain=domain)
+                except Exception:
+                    best = contacts.get('emails', [None])[0] if contacts.get('emails') else None
+                if best:
+                    r['email'] = best
+                    r['has_email'] = True
+                    r['email_source'] = 'scraped'
+                elif domain:
+                    # Fallback: info@domain (user can verify before sending)
+                    r['email'] = 'info@' + domain
+                    r['has_email'] = True
+                    r['email_source'] = 'generated'
+            
+            # Fill phone if missing
+            if not already_has_phone:
+                phones = contacts.get('phones', [])
+                if phones:
+                    r['phone'] = phones[0]
+        except Exception as e:
+            print(f"[enrich] err on {r.get('name','?')}: {e}")
+        return r
+
+    # Run enrichment in parallel — cap to 30 to stay within Render's 30s budget
+    if results:
+        enrich_cap = min(30, len(results))
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            enriched = list(pool.map(_enrich_lead, results[:enrich_cap]))
+        results = enriched + results[enrich_cap:]
+
     # Mark already-saved
     if results:
         place_ids = [r["place_id"] for r in results]
@@ -3614,6 +3664,100 @@ def scrape_emails_from_website(website, per_url_timeout=4):
             except: pass
             continue
     return all_emails
+
+
+
+
+def scrape_contacts_from_website(website, per_url_timeout=4):
+    """Visit homepage + /contact + /about. Returns {emails: [...], phones: [...]}."""
+    if not website:
+        return {'emails': [], 'phones': []}
+    if not website.startswith(('http://', 'https://')):
+        website = 'https://' + website
+    base = website.rstrip('/')
+    urls = [base, base + '/contact', base + '/contact-us', base + '/about']
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate',
+    }
+    all_emails = []
+    all_phones = []
+    MAX_BYTES = 250_000
+    for url in urls:
+        try:
+            r = requests.get(url, timeout=per_url_timeout, headers=headers, allow_redirects=True, verify=False, stream=True)
+            if r.status_code != 200:
+                r.close()
+                continue
+            buf = b""
+            for chunk in r.iter_content(chunk_size=16384):
+                if not chunk:
+                    continue
+                buf += chunk
+                if len(buf) >= MAX_BYTES:
+                    break
+            r.close()
+            try:
+                text = buf.decode('utf-8', errors='ignore')
+            except Exception:
+                text = ""
+            if not text:
+                continue
+
+            # EMAILS — both raw and mailto:
+            try:
+                for e in _EMAIL_RE.findall(text):
+                    ne = _normalize_email(e)
+                    if _is_valid_email(ne) and ne not in all_emails:
+                        all_emails.append(ne)
+            except Exception:
+                pass
+            try:
+                for e in _re.findall(r"mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})", text):
+                    ne = _normalize_email(e)
+                    if _is_valid_email(ne) and ne not in all_emails:
+                        all_emails.append(ne)
+            except Exception:
+                pass
+
+            # PHONES — tel: links + UAE/international patterns
+            try:
+                for p in _re.findall(r"tel:([+\d\s().\-]{7,25})", text):
+                    digits = _re.sub(r'[^\d+]', '', p)
+                    if 7 <= len(digits.lstrip('+')) <= 15 and digits not in all_phones:
+                        all_phones.append(digits)
+            except Exception:
+                pass
+            try:
+                # UAE-specific: +971 with 8-9 digits OR local 04/05/06/07/02 + 7 digits
+                for m_phone in _re.finditer(r'(\+971[\s\-]?\d{1,2}[\s\-]?\d{3}[\s\-]?\d{4}|0\d[\s\-]?\d{3}[\s\-]?\d{4})', text):
+                    digits = _re.sub(r'[^\d+]', '', m_phone.group(0))
+                    if 7 <= len(digits.lstrip('+')) <= 15 and digits not in all_phones:
+                        all_phones.append(digits)
+            except Exception:
+                pass
+            try:
+                # Generic international (+CC ...)
+                for m_phone in _re.finditer(r'(\+\d{1,3}[\s\-]?\d{2,4}[\s\-]?\d{3,4}[\s\-]?\d{3,4})', text):
+                    digits = _re.sub(r'[^\d+]', '', m_phone.group(0))
+                    if 8 <= len(digits.lstrip('+')) <= 15 and digits not in all_phones:
+                        all_phones.append(digits)
+            except Exception:
+                pass
+
+            # Stop early if we have enough
+            if len(all_emails) >= 5 and len(all_phones) >= 2 and url == base:
+                break
+        except Exception:
+            try:
+                r.close()
+            except Exception:
+                pass
+            continue
+
+    return {'emails': all_emails[:10], 'phones': all_phones[:5]}
 
 
 def enrich_lead_with_email(lead):
