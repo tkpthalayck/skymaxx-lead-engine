@@ -2,7 +2,7 @@
 UAE MANUFACTURING SEARCH — VERIFY EMAIL + PHONE ENRICHMENT
 =================================================================
 Login OK
-Search HTTP 200 (0.6s)
+Search HTTP 200 (1.0s)
 Total results: 1
 
   Has email:      0/1 (0 scraped + 0 generated@domain)
