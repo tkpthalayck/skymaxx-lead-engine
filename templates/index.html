@@ -2010,6 +2010,7 @@ async function loadCampaigns() {
       '<td>' + (sb[c.status] || c.status) + '</td>' +
       '<td>' + (c.actually_sent || 0) + '/' + c.recipient_count +
         (c.next_send_at ? '<br/><span style="font-size:10px;color:var(--accent)">next: ' + new Date(c.next_send_at + 'Z').toLocaleDateString() + '</span>' : '') +
+        (c.step_progress && c.step_progress.length ? renderStepProgress(c.step_progress) : '') +
         '</td>' +
       '<td>' + c.risk_score + '/100</td>' +
       '<td>~' + Math.round((c.recipient_count * (c.est_reply_rate || 0)) / 100) + '</td>' +
