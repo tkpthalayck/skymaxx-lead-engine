@@ -705,40 +705,7 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
 
 <script>
 
-// Bulletproof fetch wrapper: always sends cookies, detects HTML-instead-of-JSON,
-// auto-redirects to /login on 401, and shows helpful errors
-(function(){
-  const _origFetch = window.fetch;
-  window.fetch = function(url, opts) {
-    opts = opts || {};
-    if (!opts.credentials) opts.credentials = 'same-origin';
-    return _origFetch.call(this, url, opts).then(async response => {
-      const ct = response.headers.get('content-type') || '';
-      // If server returns 401 on an API call, redirect to login
-      if (response.status === 401 && (url+'').indexOf('/api/') === 0) {
-        console.warn('[fetch] 401 unauthorized on', url, '→ redirecting to /login');
-        window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
-        // Return empty response to satisfy callers
-        return new Response(JSON.stringify({error:'redirecting to login'}), {status:401, headers:{'content-type':'application/json'}});
-      }
-      // Detect HTML-instead-of-JSON for API calls (the "Unexpected token <" symptom)
-      if ((url+'').indexOf('/api/') === 0 && ct.indexOf('text/html') >= 0) {
-        const body = await response.clone().text();
-        console.error('[fetch] API returned HTML instead of JSON:', url, body.slice(0,300));
-        // If it looks like a login page, redirect
-        if (body.toLowerCase().indexOf('login') >= 0 || response.status === 302) {
-          window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
-        }
-        // Return a clean JSON error so .json() doesn't throw "Unexpected token <"
-        return new Response(JSON.stringify({
-          error: 'session_expired',
-          detail: 'Server returned HTML (likely session expired). Please log in again.'
-        }), {status: response.status, headers: {'content-type':'application/json'}});
-      }
-      return response;
-    });
-  };
-})();
+// fetch override removed for debugging
 
 let citiesList = [];
 let selectedCategories = new Set();
@@ -1259,63 +1226,79 @@ if (typeof qsResults === 'undefined') { window.qsResults = []; }
 if (typeof qsSelected === 'undefined') { window.qsSelected = new Set(); }
 
 function renderQSResults() {
-  const div = document.getElementById('qs-results');
+  var div = document.getElementById('qs-results');
   if (!div) {
-    console.error('[renderQSResults] qs-results div NOT FOUND in DOM');
-    alert('Render error: qs-results div missing in page'); return;
-  }
-  console.log('[renderQSResults] starting, qsResults =', qsResults ? qsResults.length : 'null/undefined');
-  
-  if (!qsResults || qsResults.length === 0) {
-    div.innerHTML = '<div class="empty"><i class="fas fa-search"></i><p>No results yet — try a search above</p></div>';
-    if (typeof updateQSCount === 'function') updateQSCount();
+    var fallback = document.createElement('div');
+    fallback.id = 'qs-results';
+    fallback.style.cssText = 'border:3px solid red;padding:20px;margin:20px;background:#fee';
+    fallback.innerHTML = '<b>ERROR: qs-results div was missing from page. This is a UI bug.</b>';
+    document.body.appendChild(fallback);
     return;
   }
-  
-  // Build a SIMPLE, bulletproof card for each result.
-  // Each card is built with safe string concatenation (no template literals, no escaping nightmares).
-  const parts = [];
-  parts.push('<div style="padding:8px 0;font-size:12px;color:#64748b">Showing ' + qsResults.length + ' leads. Click a card to select it, then use "Add to New Campaign".</div>');
-  
-  for (let i = 0; i < qsResults.length; i++) {
-    const r = qsResults[i];
-    const pid = String(r.place_id || ('lead-' + i));
-    const safePid = pid.replace(/'/g, '');  // strip any apostrophes that would break onclick
-    const isSel = qsSelected.has(pid);
-    const name = String(r.name || 'Unnamed');
-    const email = String(r.email || '');
-    const phone = String(r.phone || '');
-    const website = String(r.website || '');
-    const address = String(r.address || '');
-    const country = String(r.country || '');
-    const category = String(r.category || '');
-    
-    const cardStyle = isSel
-      ? 'border:2px solid #3b82f6;background:#eff6ff;border-radius:8px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;gap:12px;align-items:flex-start'
-      : 'border:1px solid #e2e8f0;background:white;border-radius:8px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;gap:12px;align-items:flex-start';
-    
-    parts.push(
-      '<div class="search-result ' + (isSel ? 'selected' : '') + '" id="qsr-' + safePid + '" style="' + cardStyle + '" onclick="qsCardClick(event, \'' + safePid + '\')">' +
-        '<input type="checkbox" style="width:20px;height:20px;margin-top:2px;flex-shrink:0" ' +
-          (isSel ? 'checked' : '') + 
-          ' onclick="event.stopPropagation()" onchange="qsToggle(\'' + safePid + '\', this)"/>' +
+
+  // FORCE the container visible no matter what CSS says
+  div.style.cssText = 'display:block;visibility:visible;opacity:1;min-height:100px;padding:15px;background:#fafbfc;border:2px solid #cbd5e1;border-radius:8px;margin-top:12px';
+
+  // Empty/null safety
+  if (!qsResults || !qsResults.length) {
+    div.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:30px"><i class="fas fa-search" style="font-size:24px"></i><div style="margin-top:10px">No results yet — try a search above</div></div>';
+    if (typeof updateQSCount === "function") updateQSCount();
+    return;
+  }
+
+  // Visible status banner
+  var statusBanner = '<div style="background:#dbeafe;border:1px solid #93c5fd;color:#1e3a8a;padding:10px 14px;border-radius:6px;margin-bottom:12px;font-size:13px"><b>✓ Showing ' + qsResults.length + ' leads.</b> Click any card to select it, then use the "Add to New Campaign" button at the bottom.</div>';
+
+  var html_parts = [statusBanner];
+
+  for (var i = 0; i < qsResults.length; i++) {
+    var r = qsResults[i] || {};
+    var pid = String(r.place_id || ("lead-" + i)).replace(/['"<>]/g, "");
+    var isSel = (typeof qsSelected !== "undefined" && qsSelected.has && qsSelected.has(pid));
+
+    var name = String(r.name || "Unnamed Business");
+    var email = String(r.email || "");
+    var phone = String(r.phone || "");
+    var website = String(r.website || "");
+    var address = String(r.address || "");
+    var category = String(r.category || "");
+
+    // ESCAPE helper inline (no dependency)
+    function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+    var borderColor = isSel ? "#3b82f6" : "#e2e8f0";
+    var bgColor = isSel ? "#eff6ff" : "white";
+    var cardStyle = "border:2px solid " + borderColor + ";background:" + bgColor + ";border-radius:8px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;gap:12px;align-items:flex-start";
+
+    var emailHtml = email ? ('<span style="color:#16a34a"><b>✉</b> ' + esc(email) + '</span>') : '<span style="color:#94a3b8">no email</span>';
+    var phoneHtml = phone ? ('<span style="color:#475569"><b>☎</b> ' + esc(phone) + '</span>') : '';
+    var websiteHtml = website ? ('<span><b>🌐</b> <a href="' + esc(website) + '" target="_blank" onclick="event.stopPropagation()" style="color:#3b82f6">' + esc(website.replace(/^https?:\/\//,"").slice(0,40)) + '</a></span>') : '';
+    var addressHtml = address ? ('<div style="font-size:11px;color:#94a3b8;margin-top:4px">📍 ' + esc(address.slice(0,90)) + '</div>') : '';
+    var categoryHtml = category ? ('<span style="background:#f1f5f9;padding:2px 8px;border-radius:4px;font-size:10px">' + esc(category) + '</span>') : '';
+
+    html_parts.push(
+      '<div class="search-result' + (isSel ? ' selected' : '') + '" id="qsr-' + pid + '" style="' + cardStyle + '" onclick="qsCardClick(event, \'' + pid + '\')">' +
+        '<input type="checkbox" style="width:20px;height:20px;margin-top:2px;flex-shrink:0;cursor:pointer" ' + (isSel ? 'checked' : '') + ' onclick="event.stopPropagation()" onchange="qsToggle(\'' + pid + '\', this)"/>' +
         '<div style="flex:1;min-width:0">' +
-          '<div style="font-weight:600;font-size:14px;color:#0f172a;margin-bottom:4px">' + escapeHtml(name) + '</div>' +
-          '<div style="font-size:12px;color:#475569;display:flex;flex-wrap:wrap;gap:12px">' +
-            (email ? '<span><i class="fas fa-envelope" style="color:#34d399"></i> ' + escapeHtml(email) + '</span>' : '<span style="color:#94a3b8"><i class="fas fa-envelope-open"></i> no email</span>') +
-            (phone ? '<span><i class="fas fa-phone"></i> ' + escapeHtml(phone) + '</span>' : '') +
-            (website ? '<span><i class="fas fa-globe"></i> <a href="' + escapeHtml(website) + '" target="_blank" onclick="event.stopPropagation()" style="color:#3b82f6">' + escapeHtml(website.replace(/^https?:\/\//,'').slice(0,40)) + '</a></span>' : '') +
-            (category ? '<span style="background:#f1f5f9;padding:2px 8px;border-radius:4px;font-size:10px">' + escapeHtml(category) + '</span>' : '') +
+          '<div style="font-weight:600;font-size:14px;color:#0f172a;margin-bottom:6px">' + esc(name) + '</div>' +
+          '<div style="font-size:12px;color:#475569;display:flex;flex-wrap:wrap;gap:14px">' +
+            emailHtml + phoneHtml + websiteHtml + categoryHtml +
           '</div>' +
-          (address ? '<div style="font-size:11px;color:#94a3b8;margin-top:4px"><i class="fas fa-map-marker-alt"></i> ' + escapeHtml(address.slice(0,80)) + '</div>' : '') +
+          addressHtml +
         '</div>' +
       '</div>'
     );
   }
-  
-  div.innerHTML = parts.join('');
-  console.log('[renderQSResults] DONE. innerHTML length =', div.innerHTML.length, '| visible:', div.offsetHeight, 'px tall');
-  if (typeof updateQSCount === 'function') updateQSCount();
+
+  try {
+    div.innerHTML = html_parts.join("");
+    console.log("[render] OK: " + qsResults.length + " cards, innerHTML=" + div.innerHTML.length + " chars, visible height=" + div.offsetHeight + "px");
+  } catch (e) {
+    div.innerHTML = '<div style="background:#fee;border:2px solid red;padding:15px;border-radius:8px"><b>RENDER ERROR:</b><br/>' + String(e) + '<br/><br/>qsResults had ' + qsResults.length + ' items.</div>';
+    console.error("[render] FAILED:", e);
+  }
+
+  if (typeof updateQSCount === "function") updateQSCount();
 }
 
 function qsToggle(pid, chk) {
