@@ -1,0 +1,17 @@
+=================================================================
+UAE MANUFACTURING SEARCH — VERIFY EMAIL + PHONE ENRICHMENT
+=================================================================
+Login OK
+Search HTTP 200 (0.6s)
+Total results: 1
+
+  Has email:      0/1 (0 scraped + 0 generated@domain)
+  Has phone:      1/1
+  Has website:    1/1
+
+Sample (first 10):
+-----------------------------------------------------------------
+   1. A E Manufacturing             
+      email:                                                 [pending]
+      phone:   041 463 3320             
+      website: http://www.aem.co.za/
