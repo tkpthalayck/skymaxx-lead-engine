@@ -1,29 +1,33 @@
 
 Query: {"source": "google_maps", "country": "AE", "category": "manufacturing"}
-  HTTP 502: <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>502</title>
-    <style>@font-face {
-  font-fami
+  → 1 results in 5.9s | email=1 (scraped=1 gen=0) | phone=1
+  → query sent to Google: manufacturing in AE
+    - A E Manufacturing              | email=info@aem.co.za | phone=041 463 3320 | src=scraped
 
 Query: {"source": "google_maps", "country": "AE", "category": "manufacturer", "state": "Dubai"}
-  HTTP 502: 
+  → 20 results in 25.5s | email=13 (scraped=2 gen=11) | phone=20
+  → query sent to Google: manufacturer in Dubai, AE
+    - Shuaiba Industrial Company     | email=info@sic-kwt.com | phone=04 880 7301 | src=scraped
+    - Products Label Manufacturers I | email= | phone=080794 43827 | src=none
+    - SIGMA FACTORY FOR STEEL PRODUC | email=info@sfsp-ikk.com | phone=04 429 7028 | src=generated
 
 Query: {"source": "google_maps", "country": "AE", "state": "Dubai", "keyword": "manufacturing companies"}
-  HTTP 502: <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>502</title>
-    <style>@font-face {
-  font-fami
+  → 20 results in 22.6s | email=13 (scraped=5 gen=8) | phone=19
+  → query sent to Google: manufacturing companies in Dubai, AE
+    - Shuaiba Industrial Company     | email=info@sic-kwt.com | phone=04 880 7301 | src=scraped
+    - Bahmani Manufacturing And Indu | email=info@bmit.ae | phone=056 520 1238 | src=generated
+    - Standard Packaging Materials M | email=info@stanpack.net | phone=04 394 9180 | src=generated
 
 Query: {"source": "google_maps", "country": "AE", "state": "Dubai", "keyword": "factory"}
-  HTTP 502: 
+  → 20 results in 24.3s | email=13 (scraped=3 gen=10) | phone=20
+  → query sent to Google: factory in Dubai, AE
+    - Nestlé Dubai Manufacturing     | email=info@nestle-mena.com | phone=04 886 7575 | src=generated
+    - Perfect Foods Factory          | email=info@tanmiah.com | phone=04 886 8111 | src=generated
+    - SIGMA FACTORY FOR STEEL PRODUC | email=info@sfsp-ikk.com | phone=04 429 7028 | src=generated
 
 Query: {"source": "google_maps", "country": "United Arab Emirates", "keyword": "manufacturer"}
-  HTTP 502: 
+  → 20 results in 25.3s | email=13 (scraped=8 gen=5) | phone=20
+  → query sent to Google: manufacturer in United Arab Emirates
+    - Gulf Manufacturing Co. LLC     | email=info@gulfmanufacturing.com | phone=06 533 0434 | src=scraped
+    - Shuaiba Industrial Company     | email=info@sic-kwt.com | phone=04 880 7301 | src=scraped
+    - Arabian Gulf Steel Industries  | email=info@agsi.ae | phone=02 555 6293 | src=scraped
