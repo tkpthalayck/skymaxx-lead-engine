@@ -1,0 +1,33 @@
+Login OK
+
+======================================================================
+STEP 1: Force-progress remaining Campaign #1 leads to step 2
+======================================================================
+HTTP 500: <html>
+  <head>
+    <title>Internal Server Error</title>
+  </head>
+  <body>
+    <h1><p>Internal Server Error</p></h1>
+    
+  </body>
+</html>
+
+
+======================================================================
+STEP 2: Final overall sequence health
+======================================================================
+Server time: 2026-05-30T01:31:13.599677
+Pending NOW: 2 leads
+Future pending: 20 leads
+
+Lead step distribution:
+  step  in_seq replied unsub count
+  1     1      0       0     41   
+  2     1      0       0     11   
+  3     1      0       0     1    
+
+Email log by step:
+  step=1 status=success    count=53
+  step=2 status=success    count=12
+  step=3 status=success    count=1
