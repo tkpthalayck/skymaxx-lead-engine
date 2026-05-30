@@ -1,7 +1,7 @@
 === 1. Login (admin/SKYMAXX@2026) ===
 HTTP 302
 Cookies:
-#HttpOnly_skymaxx-lead-engine.onrender.com	FALSE	/	TRUE	1782744512	session	eyJfcGVybWFuZW50Ijp0cnVlLCJ1c2VyIjoiYWRtaW4ifQ.ahr4wA.Jvr6Pe3rdb3lmgT6jZdFIoFy2v8
+#HttpOnly_skymaxx-lead-engine.onrender.com	FALSE	/	TRUE	1782744624	session	eyJfcGVybWFuZW50Ijp0cnVlLCJ1c2VyIjoiYWRtaW4ifQ.ahr5MA.b-QGZ5ciuHjp--z62qaqYICxqUY
 
 === 2. GET /api/sequence/templates ===
 OK: 5 templates
@@ -12,7 +12,7 @@ OK: 5 templates
   step5: edited=False | subj=Closing the loop - and 4 free resources for {{company}}
 
 === 3. POST save_template (step 1 edit) ===
-{"detail":"name 'session' is not defined","error":"NameError"}
+{"error":"save failed: column \"id\" does not exist\nLINE 4: ...RRENT_TIMESTAMP, updated_by=EXCLUDED.updated_by RETURNING id\n                                                                     ^\n"}
 
 
 === 4. Verify edit ===
