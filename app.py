@@ -1177,6 +1177,97 @@ def process_pending_sends(max_per_run=None):
 # CRON ENDPOINT — call this every 5 min from an external cron service
 # (e.g. cron-job.com, UptimeRobot) to keep Render awake AND process sends
 # ═══════════════════════════════════════════════════════════════════════
+
+
+@app.route("/api/admin/diag", methods=["GET"])
+def admin_diag():
+    """Comprehensive sequence/campaign health check."""
+    conn = get_db()
+    report = {}
+    
+    # Campaigns overview
+    report["campaigns"] = []
+    for c in rows_to_list(conn.execute("SELECT id, name, status, actually_sent, recipient_count, created_at FROM campaigns ORDER BY id DESC LIMIT 10").fetchall()):
+        try:
+            lids = json.loads(c.get("lead_ids_json") or "[]")
+        except: lids = []
+        if not lids:
+            # fetch lead_ids_json
+            row = conn.execute("SELECT lead_ids_json FROM campaigns WHERE id=?", [c["id"]]).fetchone()
+            try: lids = json.loads(row[0] if row else "[]")
+            except: lids = []
+        c["lead_count"] = len(lids)
+        report["campaigns"].append(c)
+
+    # Leads breakdown — sequence_step distribution
+    step_breakdown = rows_to_list(conn.execute("""
+        SELECT sequence_step, in_sequence, replied, unsubscribed, COUNT(*) as cnt
+        FROM leads
+        GROUP BY sequence_step, in_sequence, replied, unsubscribed
+        ORDER BY sequence_step
+    """).fetchall())
+    report["lead_step_distribution"] = step_breakdown
+    
+    # Email log breakdown by step
+    log_breakdown = rows_to_list(conn.execute("""
+        SELECT step, status, COUNT(*) as cnt FROM email_log
+        GROUP BY step, status ORDER BY step, status
+    """).fetchall())
+    report["email_log_by_step"] = log_breakdown
+
+    # Pending leads — what SHOULD be sent right now
+    now = datetime.utcnow().isoformat()
+    pending = rows_to_list(conn.execute("""
+        SELECT id, name, email, sequence_step, next_send_at, campaign_id
+        FROM leads
+        WHERE in_sequence=1 AND unsubscribed=0 AND replied=0
+          AND email IS NOT NULL AND email != ''
+          AND (next_send_at IS NULL OR next_send_at <= ?)
+          AND sequence_step < 5
+        ORDER BY next_send_at ASC LIMIT 20
+    """, [now]).fetchall())
+    report["pending_now"] = pending
+    report["pending_count"] = len(pending)
+    report["server_time_utc"] = now
+
+    # Future-pending leads (waiting their turn)
+    future = rows_to_list(conn.execute("""
+        SELECT id, name, sequence_step, next_send_at, campaign_id
+        FROM leads
+        WHERE in_sequence=1 AND unsubscribed=0 AND replied=0
+          AND next_send_at > ?
+          AND sequence_step < 5
+        ORDER BY next_send_at ASC LIMIT 20
+    """, [now]).fetchall())
+    report["future_pending"] = future
+    report["future_pending_count"] = len(future)
+    
+    # Stuck leads — in_sequence=1, sequence_step >= 1, but no next_send_at set
+    stuck = rows_to_list(conn.execute("""
+        SELECT id, name, sequence_step, next_send_at, in_sequence, campaign_id
+        FROM leads
+        WHERE in_sequence=1 AND sequence_step >= 1 AND sequence_step < 5
+          AND next_send_at IS NULL
+          AND replied=0 AND unsubscribed=0
+    """).fetchall())
+    report["stuck_no_next_send_at"] = stuck
+
+    # Recent email log
+    report["recent_emails"] = rows_to_list(conn.execute("""
+        SELECT id, lead_id, step, to_email, subject, status, error_msg, sent_at
+        FROM email_log ORDER BY id DESC LIMIT 20
+    """).fetchall())
+
+    # Daily send count
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    cnt_row = conn.execute("SELECT count FROM daily_send_count WHERE date=?", [today]).fetchone()
+    report["today_send_count"] = cnt_row[0] if cnt_row else 0
+    report["daily_limit"] = DAILY_SEND_LIMIT
+    
+    conn.close()
+    return jsonify(report)
+
+
 @app.route("/api/cron/process", methods=["GET", "POST"])
 def cron_process():
     """External-cron-driven processor. Call from cron-job.com every 5 min.
