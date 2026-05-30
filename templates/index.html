@@ -912,9 +912,21 @@ function showModal({title, from, to, subject, bodyHtml, footer}) {
     <div><strong>To:</strong> ${to||'?'}</div>
     <div><strong>Subject:</strong> ${subject||'?'}</div>`;
   document.getElementById('modal-footer-text').textContent = footer || '';
+  
+  // FIX: Render order matters — show modal first so iframe is visible & sized,
+  // then reset srcdoc, then set actual content on next frame so browser fully re-renders.
+  // Previously the iframe got srcdoc while hidden, causing stale/blank render until refresh.
   const iframe = document.getElementById('modal-iframe');
-  iframe.srcdoc = bodyHtml || '<p>No content</p>';
   document.getElementById('email-modal').classList.add('show');
+  // Clear iframe completely (forces unload of previous document)
+  iframe.srcdoc = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;font-family:-apple-system,sans-serif;color:#94a3b8;padding:40px;text-align:center"><div>Loading email&hellip;</div></body></html>';
+  // Set actual content after a tick (lets the modal animation + iframe reset complete)
+  const payload = bodyHtml || '<p style="padding:40px;color:#64748b">No content</p>';
+  setTimeout(function() {
+    iframe.srcdoc = payload;
+    // Trigger reflow to force re-render in stubborn browsers
+    void iframe.offsetHeight;
+  }, 50);
 }
 
 function closeModal() {
