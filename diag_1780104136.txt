@@ -1,0 +1,57 @@
+======================================================================
+SEQUENCE HEALTH DIAGNOSTIC
+======================================================================
+Server UTC time: 2026-05-30T01:22:16.224598
+Today's send count: 0/300
+
+CAMPAIGNS:
+  #5 Outreach 5/30/2026                       | status=running    | sent=15/15 | leads=15
+  #4 Outreach 5/29/2026                       | status=running    | sent=19/19 | leads=19
+  #3 Outreach 5/29/2026                       | status=running    | sent=5/5 | leads=5
+  #1 Outreach 5/25/2026                       | status=running    | sent=14/14 | leads=14
+
+LEAD SEQUENCE_STEP DISTRIBUTION:
+  step  in_seq replied unsub count
+  1     1      0       0     53   
+
+EMAIL_LOG BY STEP:
+  step  status     count
+  1     success    53   
+
+PENDING NOW (should be sent immediately): 0 leads
+
+FUTURE-PENDING (waiting): 20 leads
+  - Sergey Barysiuk                | step=1 | next_send=2026-05-30T02:40:25.702995
+  - Aaron Barak                    | step=1 | next_send=2026-05-30T02:40:28.400745
+  - Chris Kucharski                | step=1 | next_send=2026-05-30T02:40:31.499805
+  - Hank Jackson                   | step=1 | next_send=2026-05-30T02:40:34.100804
+  - James Stanford                 | step=1 | next_send=2026-05-30T02:40:36.701188
+  - Raymond Churgovich             | step=1 | next_send=2026-05-30T02:40:39.309440
+  - Tom Monahan                    | step=1 | next_send=2026-05-30T02:40:42.304885
+  - Michael Hinman                 | step=1 | next_send=2026-05-30T02:40:45.004747
+  - Dan Aldis                      | step=1 | next_send=2026-05-30T02:40:47.705120
+  - Liam Connor                    | step=1 | next_send=2026-05-30T02:40:50.301895
+
+STUCK LEADS (in_sequence=1, step>=1, next_send_at=NULL): 0
+
+RECENT EMAILS (last 20):
+  Fri, 29 May 2026 20 | step1 | info@therealtordubai.com            | success  
+  Fri, 29 May 2026 20 | step1 | info@jadeandco.com                  | success  
+  Fri, 29 May 2026 20 | step1 | info@alkhail.ae                     | success  
+  Fri, 29 May 2026 20 | step1 | info@drivenproperties.com           | success  
+  Fri, 29 May 2026 20 | step1 | info@magusproperties.ae             | success  
+  Fri, 29 May 2026 20 | step1 | info@homeland.ae                    | success  
+  Fri, 29 May 2026 20 | step1 | info@arabianestates.ae              | success  
+  Fri, 29 May 2026 20 | step1 | media@nextlevelrealestate.ae        | success  
+  Fri, 29 May 2026 20 | step1 | info@elitepropertydxb.com           | success  
+  Fri, 29 May 2026 20 | step1 | info@xrealty.ae                     | success  
+  Fri, 29 May 2026 20 | step1 | info@harbordubai.com                | success  
+  Fri, 29 May 2026 20 | step1 | info@homes4life.ae                  | success  
+  Fri, 29 May 2026 20 | step1 | info@mcconeproperties.com           | success  
+  Fri, 29 May 2026 20 | step1 | info@providentestate.com            | success  
+  Fri, 29 May 2026 20 | step1 | info@springfieldproperties.ae       | success  
+  Fri, 29 May 2026 13 | step1 | info@europoxy.com                   | success  
+  Fri, 29 May 2026 13 | step1 | jai@wpcintl.net                     | success  
+  Fri, 29 May 2026 13 | step1 | info@aerodyneuae.com                | success  
+  Fri, 29 May 2026 13 | step1 | info@cambro.com                     | success  
+  Fri, 29 May 2026 13 | step1 | info@sahrasteelpipes.com            | success  
