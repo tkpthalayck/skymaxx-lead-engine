@@ -771,8 +771,11 @@ def _init_pg_schema(conn):
         )""",
         "ALTER TABLE leads ADD COLUMN IF NOT EXISTS company TEXT",
         "ALTER TABLE leads ADD COLUMN IF NOT EXISTS title TEXT",
+        "DROP TABLE IF EXISTS template_overrides",
+        
         """CREATE TABLE IF NOT EXISTS template_overrides (
-            step INTEGER PRIMARY KEY,
+            id SERIAL PRIMARY KEY,
+            step INTEGER UNIQUE NOT NULL,
             subject TEXT,
             body TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -923,7 +926,8 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_lga_lead ON lead_group_assignments(lead_id);
         CREATE INDEX IF NOT EXISTS idx_lga_group ON lead_group_assignments(group_id);
         CREATE TABLE IF NOT EXISTS template_overrides (
-            step INTEGER PRIMARY KEY,
+            id SERIAL PRIMARY KEY,
+            step INTEGER UNIQUE NOT NULL,
             subject TEXT,
             body TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
