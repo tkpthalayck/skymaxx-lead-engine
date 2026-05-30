@@ -1,0 +1,112 @@
+════════════════════════════════════════════════
+SKYMAXX LEAD ENGINE — FINAL SMOKE TEST
+2026-05-30 15:07:00 UTC
+════════════════════════════════════════════════
+
+── 1. App responsive ──
+GET / → HTTP 302 in 0.172246s
+GET /login → HTTP 200 in 0.166571s
+
+── 2. Login ──
+POST /login → HTTP 302
+
+── 3. /api/admin/diag (DB health) ──
+{
+    "campaigns": [
+        {
+            "actually_sent": 50,
+            "created_at": "Sat, 30 May 2026 02:56:34 GMT",
+            "id": 7,
+            "lead_count": 50,
+            "name": "Outreach 5/30/2026",
+            "recipient_count": 50,
+            "status": "running"
+        },
+        {
+            "actually_sent": 13,
+            "created_at": "Sat, 30 May 2026 02:00:46 GMT",
+            "id": 6,
+            "lead_count": 13,
+            "name": "Outreach 5/30/2026",
+            "recipient_count": 13,
+            "status": "running"
+        },
+        {
+            "actually_sent": 15,
+            "created_at": "Fri, 29 May 2026 20:08:05 GMT",
+            "id": 5,
+            "lead_count": 15,
+            "name": "Outreach 5/30/2026",
+            "recipient_count": 15,
+            "status": "running"
+        },
+        {
+            "actually_sent": 19,
+            "created_at": "Fri, 29 May 2026 13:25:22 GMT",
+            "id": 4,
+            "lead_count": 19,
+            "name": "Outreach 5/29/2026",
+            "recipient_count": 19,
+            "status": "running"
+        },
+        {
+            "actually_sent": 5,
+            "created_at": "Fri, 29 May 2026 13:05:19 GMT",
+            "id": 3,
+            "lead_count": 5,
+            "name": "Outreach 5/29/2026",
+            "recipient_count": 5,
+            "status": "running"
+        },
+        {
+            "actually_sent": 29,
+            "created_at": "Mon, 25 May 2026 13:22:04 GMT",
+
+── 4. /api/sequence/templates (no-assumption messaging) ──
+  → 5 templates
+    step 1: edited=    0 | subject: Office 365 Email Services for {{company}} - productivity, securit
+    step 2: edited=    0 | subject: A practical look at Office 365 Email Services
+    step 3: edited=    0 | subject: What our one-day email assessment covers
+    step 4: edited=    0 | subject: Why email infrastructure matters for {{company}}
+    step 5: edited=    0 | subject: Closing the loop - and 4 free resources for {{company}}
+
+── 5. Assumption phrase audit ──
+    step 1: ✓ clean
+    step 2: ✓ clean
+    step 3: ✓ clean
+    step 4: ✓ clean
+    step 5: ✓ clean
+
+  RESULT: ✓ ALL TEMPLATES CLEAN — NO INFRASTRUCTURE ASSUMPTIONS
+
+── 6. Direct edit endpoint cycle ──
+{"ok":true,"saved_by":"admin","step":2}
+
+    POST save_template → HTTP 200
+    step 2 after save: edited=True, by=admin, subj=SMOKE TEST
+{"ok":true,"step":2}
+
+    POST reset_template/2 → HTTP 200
+    step 2 after reset: edited=False, subj=A practical look at Office 365 Email Services
+
+── 7. /api/campaigns (sequence engine state) ──
+Traceback (most recent call last):
+  File "<stdin>", line 2, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+── 8. Piggyback cron last-run ──
+
+════════════════════════════════════════════════
+                SMOKE TEST DONE
+════════════════════════════════════════════════
