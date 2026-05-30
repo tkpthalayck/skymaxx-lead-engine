@@ -1,0 +1,127 @@
+name: V4 Multi-Domain Test
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          set +e
+          BASE="https://skymaxx-lead-engine.onrender.com"
+          {
+            echo "════════════════════════════════════════"
+            echo "V4 MULTI-DOMAIN VERIFICATION"
+            echo "$(date -u +%H:%M:%S)"
+            echo "════════════════════════════════════════"
+            
+            echo ""
+            echo "── 1. /api/health (still works) ──"
+            curl -s "$BASE/api/health" -w " HTTP %{http_code}\n"
+            
+            echo ""
+            echo "── 2. Login ──"
+            curl -s -c /tmp/cj -X POST "$BASE/login" \
+              --data-urlencode "username=admin" --data-urlencode "password=SKYMAXX@2026" \
+              -o /dev/null -w "Login HTTP %{http_code}\n"
+            
+            echo ""
+            echo "── 3. NEW /api/domains ──"
+            curl -s -b /tmp/cj "$BASE/api/domains" > /tmp/dm.json
+            python3 << 'PY1'
+          import json
+          d = json.load(open('/tmp/dm.json'))
+          print(f"Got {len(d.get('domains', []))} domains:")
+          for dm in d.get('domains', []):
+              print(f"  - {dm['key']:12} | {dm['label']:25} | {dm['audience']:3} | from {dm['sender_email']}")
+          PY1
+            
+            echo ""
+            echo "── 4. /api/sequence/templates?domain=skymaxx ──"
+            curl -s -b /tmp/cj "$BASE/api/sequence/templates?domain=skymaxx" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print(f'{len(d)} templates')
+          for t in d:
+              has_parens = '(www.' in t['body']
+              print(f\"  step{t['step']}: subj={t['subject'][:55]:55} | parens={'YES BAD' if has_parens else 'NO ✓'}\")"
+            
+            echo ""
+            echo "── 5. /api/sequence/templates?domain=toolsshopy ──"
+            curl -s -b /tmp/cj "$BASE/api/sequence/templates?domain=toolsshopy" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print(f'{len(d)} templates')
+          for t in d:
+              print(f\"  step{t['step']}: subj={t['subject'][:55]}\")"
+            
+            echo ""
+            echo "── 6. /api/sequence/templates?domain=royalgroups ──"
+            curl -s -b /tmp/cj "$BASE/api/sequence/templates?domain=royalgroups" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print(f'{len(d)} templates')
+          for t in d:
+              print(f\"  step{t['step']}: subj={t['subject'][:55]}\")"
+            
+            echo ""
+            echo "── 7. /api/groups (should show 3 new default groups) ──"
+            curl -s -b /tmp/cj "$BASE/api/groups" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          groups = d.get('groups', [])
+          print(f'{len(groups)} groups total:')
+          for g in groups:
+              print(f\"  - {g['name']:35} | domain={g.get('domain_key','?'):12} | leads={g.get('lead_count',0)}\")"
+            
+            echo ""
+            echo "── 8. Save edit to step 1 of toolsshopy ──"
+            curl -s -b /tmp/cj -X POST "$BASE/api/sequence/save_template" \
+              -H "Content-Type: application/json" \
+              -d '{"step":1,"domain":"toolsshopy","subject":"TEST EDIT","body":"<p>hi</p>"}'
+            echo ""
+            
+            echo ""
+            echo "── 9. Verify toolsshopy edit applied (skymaxx unchanged) ──"
+            curl -s -b /tmp/cj "$BASE/api/sequence/templates?domain=toolsshopy" | python3 -c "
+          import sys, json
+          for t in json.load(sys.stdin):
+              if t['step']==1: print(f\"  toolsshopy step1 (after edit): edited={t.get('edited')}, subj={t['subject']}\")"
+            curl -s -b /tmp/cj "$BASE/api/sequence/templates?domain=skymaxx" | python3 -c "
+          import sys, json
+          for t in json.load(sys.stdin):
+              if t['step']==1: print(f\"  skymaxx step1 (should be unchanged): edited={t.get('edited')}, subj={t['subject'][:55]}\")"
+            
+            echo ""
+            echo "── 10. Reset toolsshopy ──"
+            curl -s -b /tmp/cj -X POST "$BASE/api/sequence/reset_template/1?domain=toolsshopy"
+            echo ""
+            
+            echo ""
+            echo "── 11. Verify campaigns still work (no schema break) ──"
+            curl -s -b /tmp/cj "$BASE/api/campaigns" -w "\nHTTP %{http_code}\n" | python3 -c "
+          import sys, json
+          try:
+              d = json.load(sys.stdin)
+              campaigns = d.get('campaigns', d) if isinstance(d, dict) else d
+              if isinstance(campaigns, list):
+                  print(f'{len(campaigns)} campaigns')
+                  for c in campaigns[:5]:
+                      print(f\"  #{c.get('id')} {c.get('name'):30} | domain={c.get('domain_key','?'):12} | status={c.get('status')}\")
+              else:
+                  print('Response:', str(d)[:200])
+          except Exception as e: print(f'ERR: {e}')"
+            
+            echo ""
+            echo "════════════════════════════════════════"
+          } > v4_result.txt 2>&1
+          cat v4_result.txt
+          exit 0
+      - run: |
+          git config user.email "v@v.com"; git config user.name "V"
+          git add v4_result.txt
+          git commit -m "v4 result [skip ci]"
+          git push
