@@ -193,6 +193,51 @@ BCC_SUPPORT         = os.getenv("BCC_SUPPORT", "true").lower() == "true"  # BCC 
 APP_URL             = os.getenv("APP_URL", "https://skymaxx-lead-engine.onrender.com").rstrip("/")
 TRACKING_ENABLED    = os.getenv("TRACKING_ENABLED", "true").lower() == "true"
 DAILY_SEND_LIMIT    = int(os.getenv("DAILY_SEND_LIMIT", "300"))
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# PIGGYBACK CRON: Keep sequence engine progressing without external cron
+# Every API request checks if process_pending_sends has run recently.
+# If 5+ minutes passed, fires it in a background daemon thread.
+# Works in tandem with GitHub Actions cron (which still fires every 1-3 hours)
+# Net effect: cron runs much more frequently when the app is active.
+# ═══════════════════════════════════════════════════════════════════════
+import threading as _piggy_threading
+import time as _piggy_time
+
+_PIGGYBACK_CRON_LAST_RUN = 0.0
+_PIGGYBACK_CRON_INTERVAL = 300.0  # 5 minutes
+_PIGGYBACK_CRON_LOCK = _piggy_threading.Lock()
+
+def _piggyback_cron_check():
+    """Called on every request. Triggers process_pending_sends if interval elapsed.
+    Non-blocking: runs in background daemon thread."""
+    global _PIGGYBACK_CRON_LAST_RUN
+    now = _piggy_time.time()
+    if now - _PIGGYBACK_CRON_LAST_RUN < _PIGGYBACK_CRON_INTERVAL:
+        return
+    if not _PIGGYBACK_CRON_LOCK.acquire(blocking=False):
+        return  # another check is already in progress
+    try:
+        _PIGGYBACK_CRON_LAST_RUN = now
+    except Exception:
+        _PIGGYBACK_CRON_LOCK.release()
+        return
+    
+    def _run_cron_bg():
+        try:
+            # Cap to a small batch — keep response fast
+            process_pending_sends(max_per_run=10)
+        except Exception as e:
+            print(f"[piggyback-cron] err: {e}")
+        finally:
+            try:
+                _PIGGYBACK_CRON_LOCK.release()
+            except Exception:
+                pass
+    
+    t = _piggy_threading.Thread(target=_run_cron_bg, daemon=True)
+    t.start()
 DB_PATH             = os.getenv("DB_PATH", "skymaxx.db")
 
 PLACES_TEXT_URL   = "https://maps.googleapis.com/maps/api/place/textsearch/json"
