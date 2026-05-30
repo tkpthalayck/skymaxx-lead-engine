@@ -1,7 +1,7 @@
 === 1. Login (admin/SKYMAXX@2026) ===
 HTTP 302
 Cookies:
-#HttpOnly_skymaxx-lead-engine.onrender.com	FALSE	/	TRUE	1782744624	session	eyJfcGVybWFuZW50Ijp0cnVlLCJ1c2VyIjoiYWRtaW4ifQ.ahr5MA.b-QGZ5ciuHjp--z62qaqYICxqUY
+#HttpOnly_skymaxx-lead-engine.onrender.com	FALSE	/	TRUE	1782744817	session	eyJfcGVybWFuZW50Ijp0cnVlLCJ1c2VyIjoiYWRtaW4ifQ.ahr58Q.9TQXJTWhytLaqhV6-xbWItyLPNo
 
 === 2. GET /api/sequence/templates ===
 OK: 5 templates
@@ -12,11 +12,11 @@ OK: 5 templates
   step5: edited=False | subj=Closing the loop - and 4 free resources for {{company}}
 
 === 3. POST save_template (step 1 edit) ===
-{"error":"save failed: column \"id\" does not exist\nLINE 4: ...RRENT_TIMESTAMP, updated_by=EXCLUDED.updated_by RETURNING id\n                                                                     ^\n"}
+{"ok":true,"saved_by":"admin","step":1}
 
 
 === 4. Verify edit ===
-step1: edited=False, by=None, subj=Office 365 Email Services for {{company}} - productivity, security, cost, body_start=<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//E
+step1: edited=True, by=admin, subj=DIAG TEST EDIT, body_start=<p>hi {{name}}</p>
 
 === 5. Reset step 1 ===
 {"ok":true,"step":1}
