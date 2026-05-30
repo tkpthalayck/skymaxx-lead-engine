@@ -1,0 +1,42 @@
+name: Confirm v3 Live
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          set +e
+          BASE="https://skymaxx-lead-engine.onrender.com"
+          {
+            echo "=== /api/health (no auth) ==="
+            curl -s "$BASE/api/health" -w "\nHTTP %{http_code} in %{time_total}s\n"
+            
+            echo ""; echo "=== Login + templates URL audit ==="
+            curl -s -c /tmp/cj -X POST "$BASE/login" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              --data-urlencode "username=admin" --data-urlencode "password=SKYMAXX@2026" \
+              -o /dev/null -w "Login: %{http_code}\n"
+            curl -s -b /tmp/cj "$BASE/api/sequence/templates" > /tmp/t.json
+            python3 << 'PY'
+          import json
+          d = json.load(open('/tmp/t.json'))
+          for t in d:
+              body = t['body']
+              url = body.count('SKYMAXX.Company')
+              header = 'href="https://www.SKYMAXX.Company"' in body[:1500]
+              footer = body.lower().rfind('skymaxx.company') > len(body) - 2000
+              print(f"  step{t['step']}: URLs={url} | header={header} | footer={footer}")
+          PY
+          } > confirm.txt 2>&1
+          cat confirm.txt
+          exit 0
+      - run: |
+          git config user.email "b@b.com"; git config user.name "B"
+          git add confirm.txt
+          git commit -m "confirm [skip ci]"
+          git push
