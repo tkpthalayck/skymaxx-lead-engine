@@ -1,7 +1,7 @@
 === 1. Login (admin/SKYMAXX@2026) ===
 HTTP 302
 Cookies:
-#HttpOnly_skymaxx-lead-engine.onrender.com	FALSE	/	TRUE	1782744355	session	eyJfcGVybWFuZW50Ijp0cnVlLCJ1c2VyIjoiYWRtaW4ifQ.ahr4Iw.zQtbeII3DD0u4A4IGqfwZSAKyIM
+#HttpOnly_skymaxx-lead-engine.onrender.com	FALSE	/	TRUE	1782744512	session	eyJfcGVybWFuZW50Ijp0cnVlLCJ1c2VyIjoiYWRtaW4ifQ.ahr4wA.Jvr6Pe3rdb3lmgT6jZdFIoFy2v8
 
 === 2. GET /api/sequence/templates ===
 OK: 5 templates
