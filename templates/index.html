@@ -2198,12 +2198,134 @@ async function openAIPanel(step) {
   if (wrap) wrap.style.display = 'none';
   const modal = document.getElementById('ai-modal');
   if (modal) modal.classList.add('show');
+  // Default to Direct Edit tab and populate fields
+  switchAITab('edit');
+  loadEditFieldsForCurrentStep();
 }
 
 function closeAIPanel() {
   const modal = document.getElementById('ai-modal');
   if (modal) modal.classList.remove('show');
 }
+
+// ─── Direct Edit Tab Functions ───
+function switchAITab(tab) {
+  document.querySelectorAll('.ai-tab-btn').forEach(b => {
+    const isActive = b.dataset.tab === tab;
+    b.classList.toggle('active', isActive);
+    b.style.color = isActive ? 'var(--text)' : 'var(--muted)';
+    b.style.borderBottomColor = isActive ? 'var(--accent)' : 'transparent';
+  });
+  document.querySelectorAll('.ai-tab-content').forEach(c => {
+    c.style.display = c.id === 'ai-tab-' + tab ? 'block' : 'none';
+  });
+}
+
+function _toast(msg, ok=true) {
+  const bar = document.getElementById('ai-edit-status-bar');
+  if (!bar) return;
+  bar.textContent = msg;
+  bar.style.display = 'block';
+  bar.style.background = ok ? '#ecfdf5' : '#fef2f2';
+  bar.style.color = ok ? '#065f46' : '#991b1b';
+  bar.style.borderLeftColor = ok ? '#10b981' : '#ef4444';
+  setTimeout(() => { bar.style.display = 'none'; }, 4000);
+}
+
+async function loadEditFieldsForCurrentStep() {
+  if (!currentAIEmail) return;
+  const subjectEl = document.getElementById('ai-edit-subject');
+  const bodyEl    = document.getElementById('ai-edit-body');
+  if (subjectEl) subjectEl.value = currentAIEmail.subject || '';
+  if (bodyEl)    bodyEl.value    = currentAIEmail.body    || '';
+  // Detect if this template is currently edited
+  try {
+    const tplData = await fetch('/api/sequence/templates').then(r=>r.json());
+    const cur = tplData.find(t => t.step === currentAIEmail.step);
+    const resetBtn = document.getElementById('ai-reset-btn');
+    if (cur && cur.edited) {
+      _toast('This template has been edited from the default' + (cur.edited_by ? ' by ' + cur.edited_by : '') + (cur.edited_at ? ' at ' + cur.edited_at : ''));
+      if (resetBtn) resetBtn.style.display = 'inline-flex';
+    } else {
+      if (resetBtn) resetBtn.style.display = 'none';
+    }
+  } catch(e) { console.warn('template status check failed', e); }
+}
+
+function previewEditedTemplate() {
+  const subject = (document.getElementById('ai-edit-subject') || {}).value || '';
+  const body    = (document.getElementById('ai-edit-body') || {}).value || '';
+  if (!subject.trim() || !body.trim()) {
+    _toast('Subject and body cannot be empty.', false);
+    return;
+  }
+  // Apply placeholders for preview
+  const fakeLead = {name:'Sarah Johnson', company:'Acme Trading LLC', city:'Dubai', website:'example.com', first_name:'Sarah'};
+  const fill = (s) => s.replace(/\{\{(\w+)\}\}/g, (_,k) => fakeLead[k] || '{{'+k+'}}');
+  showModal({
+    title: 'Preview (unsaved edits) — Step ' + (currentAIEmail ? currentAIEmail.step : '?'),
+    from: 'SKYMAXX Support Team <support@skymaxx.company>',
+    to: 'Sarah Johnson <sarah@example.com>',
+    subject: fill(subject),
+    bodyHtml: fill(body),
+    footer: 'Preview only — click "Save Changes" to persist these edits'
+  });
+}
+
+async function saveEditedTemplate() {
+  if (!currentAIEmail) { _toast('No template selected', false); return; }
+  const subject = (document.getElementById('ai-edit-subject') || {}).value || '';
+  const body    = (document.getElementById('ai-edit-body') || {}).value || '';
+  if (!subject.trim() || !body.trim()) {
+    _toast('Subject and body cannot be empty.', false);
+    return;
+  }
+  const btn = document.getElementById('ai-save-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...'; }
+  try {
+    const res = await fetch('/api/sequence/save_template', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({step: currentAIEmail.step, subject, body})
+    }).then(r=>r.json());
+    if (res.error) {
+      _toast('Save failed: ' + res.error, false);
+    } else {
+      _toast('Saved! All future emails for step ' + res.step + ' will use these edits.');
+      currentAIEmail.subject = subject;
+      currentAIEmail.body    = body;
+      // Reload templates so UI reflects the edit
+      if (typeof loadSequences === 'function') loadSequences();
+      const resetBtn = document.getElementById('ai-reset-btn');
+      if (resetBtn) resetBtn.style.display = 'inline-flex';
+    }
+  } catch(e) {
+    _toast('Save failed: ' + e.message, false);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Changes'; }
+  }
+}
+
+async function resetTemplateToDefault() {
+  if (!currentAIEmail) return;
+  if (!confirm('Reset step ' + currentAIEmail.step + ' to the code default? This will discard your saved edits for this step.')) return;
+  try {
+    const res = await fetch('/api/sequence/reset_template/' + currentAIEmail.step, {method:'POST'}).then(r=>r.json());
+    if (res.error) {
+      _toast('Reset failed: ' + res.error, false);
+    } else {
+      _toast('Reset to default. Reloading...');
+      // Reload templates and refresh edit fields
+      if (typeof loadSequences === 'function') await loadSequences();
+      // Re-open with fresh data
+      setTimeout(() => openAIPanel(currentAIEmail.step), 500);
+    }
+  } catch(e) {
+    _toast('Reset failed: ' + e.message, false);
+  }
+}
+
+
 
 async function runAIAction(action) {
   if (!currentAIEmail) return;
@@ -2359,15 +2481,42 @@ function goHome() {
       <button class="modal-close" onclick="closeAIPanel()" style="color:#fff">&times;</button>
     </div>
     <div class="ai-panel-body">
-      <div id="ai-not-configured" class="alert alert-warn" style="display:none">
-        <i class="fas fa-key"></i>
-        <div><strong>AI not configured.</strong> Add <code>AI_PROVIDER</code> (anthropic|openai) and <code>AI_API_KEY</code> environment variables in Render dashboard to enable AI features.</div>
+      <!-- Tab bar -->
+      <div class="ai-tab-bar" style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:18px">
+        <button class="ai-tab-btn active" data-tab="edit" onclick="switchAITab('edit')" style="flex:1;background:transparent;border:0;padding:12px 18px;font-size:14px;font-weight:600;color:var(--text);border-bottom:3px solid var(--accent);cursor:pointer"><i class="fas fa-pen-to-square" style="margin-right:6px"></i>Direct Edit</button>
+        <button class="ai-tab-btn" data-tab="ai" onclick="switchAITab('ai')" style="flex:1;background:transparent;border:0;padding:12px 18px;font-size:14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer"><i class="fas fa-wand-magic-sparkles" style="margin-right:6px"></i>AI Actions</button>
       </div>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Pick an action to improve this email. AI will preserve all variables like <code>{{first_name}}</code>.</p>
-      <div class="ai-actions-grid" id="ai-actions-grid"></div>
-      <div id="ai-result-wrapper" style="display:none">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">AI Result</div>
-        <div class="ai-result" id="ai-result"></div>
+
+      <!-- ── DIRECT EDIT TAB ── -->
+      <div id="ai-tab-edit" class="ai-tab-content">
+        <div id="ai-edit-status-bar" style="display:none;font-size:12px;background:#ecfdf5;color:#065f46;padding:8px 12px;border-radius:6px;margin-bottom:12px;border-left:3px solid #10b981"></div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5">Edit the subject and body below. Use placeholders <code>{{name}}</code>, <code>{{company}}</code> in either field — they will be replaced when the email is sent. Preview to see the rendered output before saving.</p>
+        
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Subject</label>
+        <input type="text" id="ai-edit-subject" maxlength="500" style="width:100%;padding:10px 12px;font-size:14px;border:1px solid var(--border);border-radius:6px;font-family:inherit;background:var(--card);color:var(--text);margin-bottom:18px" />
+        
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Body HTML</label>
+        <textarea id="ai-edit-body" maxlength="200000" style="width:100%;height:340px;padding:12px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:'SFMono-Regular',Consolas,'Courier New',monospace;background:#0f172a;color:#cbd5e1;line-height:1.5;resize:vertical"></textarea>
+        
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <button onclick="previewEditedTemplate()" class="btn btn-secondary" style="flex:1;min-width:140px"><i class="fas fa-eye"></i> Preview</button>
+          <button onclick="saveEditedTemplate()" class="btn btn-primary" id="ai-save-btn" style="flex:1;min-width:140px"><i class="fas fa-save"></i> Save Changes</button>
+          <button onclick="resetTemplateToDefault()" class="btn btn-danger-outline" id="ai-reset-btn" style="min-width:140px"><i class="fas fa-rotate-left"></i> Reset to Default</button>
+        </div>
+      </div>
+
+      <!-- ── AI ACTIONS TAB ── -->
+      <div id="ai-tab-ai" class="ai-tab-content" style="display:none">
+        <div id="ai-not-configured" class="alert alert-warn" style="display:none">
+          <i class="fas fa-key"></i>
+          <div><strong>AI not configured.</strong> Add <code>AI_PROVIDER</code> (anthropic|openai) and <code>AI_API_KEY</code> environment variables in Render dashboard to enable AI features.</div>
+        </div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Pick an action to improve this email. AI will preserve all variables like <code>{{first_name}}</code>.</p>
+        <div class="ai-actions-grid" id="ai-actions-grid"></div>
+        <div id="ai-result-wrapper" style="display:none">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">AI Result</div>
+          <div class="ai-result" id="ai-result"></div>
+        </div>
       </div>
     </div>
   </div>
