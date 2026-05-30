@@ -1,0 +1,23 @@
+name: Run Test with Output Commit
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sleep 5
+      - run: |
+          python3 test_direct_edit.py > test_result.txt 2>&1
+          EXIT=$?
+          echo "Exit code: $EXIT" >> test_result.txt
+          cat test_result.txt
+          exit 0  # Don't fail the workflow so it can commit
+      - run: |
+          git config user.email "test@bot.com"
+          git config user.name "Test Bot"
+          git add test_result.txt
+          git commit -m "test result [skip ci]" || true
+          git push || true
