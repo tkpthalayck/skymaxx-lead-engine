@@ -1,0 +1,64 @@
+════════════════════════════════════════
+V4 MULTI-DOMAIN VERIFICATION
+19:48:30
+════════════════════════════════════════
+
+── 1. /api/health (still works) ──
+{"db":"ok","db_latency_ms":10,"service":"skymaxx-lead-engine","status":"ok","ts":1780170510}
+ HTTP 200
+
+── 2. Login ──
+Login HTTP 302
+
+── 3. NEW /api/domains ──
+Got 3 domains:
+  - skymaxx      | SKYMAXX.Company           | b2b | from support@skymaxx.company
+  - toolsshopy   | ToolsShopy.Store          | b2c | from support@toolsshopy.store
+  - royalgroups  | RoyalGroups.Shop          | b2c | from support@royalgroups.shop
+
+── 4. /api/sequence/templates?domain=skymaxx ──
+5 templates
+  step1: subj=Office 365 Email Services for {{company}} - productivit | parens=NO ✓
+  step2: subj=A practical look at Office 365 Email Services           | parens=NO ✓
+  step3: subj=What our one-day email assessment covers                | parens=NO ✓
+  step4: subj=Why email infrastructure matters for {{company}}        | parens=NO ✓
+  step5: subj=Closing the loop - and 4 free resources for {{company}} | parens=NO ✓
+
+── 5. /api/sequence/templates?domain=toolsshopy ──
+5 templates
+  step1: subj=Welcome to ToolsShopy.Store
+  step2: subj=Tools our customers reach for most
+  step3: subj=How we curate what we sell
+  step4: subj=New arrivals and continuing favorites
+  step5: subj=A few favorites worth bookmarking
+
+── 6. /api/sequence/templates?domain=royalgroups ──
+5 templates
+  step1: subj=Welcome to RoyalGroups.Shop
+  step2: subj=This month's editor picks
+  step3: subj=A note on how we curate our selection
+  step4: subj=New arrivals and member favorites
+  step5: subj=Three categories worth knowing about
+
+── 7. /api/groups (should show 3 new default groups) ──
+3 groups total:
+  - RoyalGroups.Shop Leads              | domain=royalgroups  | leads=0
+  - SKYMAXX.Company Leads               | domain=skymaxx      | leads=0
+  - ToolsShopy.Store Leads              | domain=toolsshopy   | leads=0
+
+── 8. Save edit to step 1 of toolsshopy ──
+{"domain":"toolsshopy","ok":true,"saved_by":"admin","step":1}
+
+
+── 9. Verify toolsshopy edit applied (skymaxx unchanged) ──
+  toolsshopy step1 (after edit): edited=True, subj=TEST EDIT
+  skymaxx step1 (should be unchanged): edited=False, subj=Office 365 Email Services for {{company}} - productivit
+
+── 10. Reset toolsshopy ──
+{"domain":"toolsshopy","ok":true,"step":1}
+
+
+── 11. Verify campaigns still work (no schema break) ──
+ERR: Extra data: line 3 column 1 (char 8987)
+
+════════════════════════════════════════
