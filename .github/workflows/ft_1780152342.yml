@@ -1,0 +1,93 @@
+name: Final Test V2
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sleep 3
+      - shell: bash
+        run: |
+          set +e
+          BASE="https://skymaxx-lead-engine.onrender.com"
+          {
+            echo "=== 1. Login (admin/SKYMAXX@2026) ==="
+            curl -s -c /tmp/cj -X POST "$BASE/login" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              --data-urlencode "username=admin" \
+              --data-urlencode "password=SKYMAXX@2026" \
+              -o /dev/null -w "HTTP %{http_code}\n"
+            echo "Cookies:"
+            grep session /tmp/cj || echo "(none found)"
+            
+            echo ""; echo "=== 2. GET /api/sequence/templates ==="
+            curl -s -b /tmp/cj "$BASE/api/sequence/templates" > /tmp/tpl.json
+            python3 << 'PYEOF1'
+          import json
+          with open('/tmp/tpl.json') as f: d = json.load(f)
+          if isinstance(d, list):
+              print(f'OK: {len(d)} templates')
+              for t in d:
+                  print(f'  step{t["step"]}: edited={t.get("edited")} | subj={t["subject"][:65]}')
+          else:
+              print(f'NOT ARRAY: {d}')
+          PYEOF1
+            
+            echo ""; echo "=== 3. POST save_template (step 1 edit) ==="
+            curl -s -b /tmp/cj -X POST "$BASE/api/sequence/save_template" \
+              -H "Content-Type: application/json" \
+              -d '{"step":1,"subject":"DIAG TEST EDIT","body":"<p>hi {{name}}</p>"}'
+            echo ""
+            
+            echo ""; echo "=== 4. Verify edit ==="
+            curl -s -b /tmp/cj "$BASE/api/sequence/templates" > /tmp/tpl.json
+            python3 << 'PYEOF2'
+          import json
+          with open('/tmp/tpl.json') as f: d = json.load(f)
+          for t in d:
+              if t['step']==1:
+                  print(f'step1: edited={t.get("edited")}, by={t.get("edited_by")}, subj={t["subject"]}, body_start={t["body"][:60]}')
+          PYEOF2
+            
+            echo ""; echo "=== 5. Reset step 1 ==="
+            curl -s -b /tmp/cj -X POST "$BASE/api/sequence/reset_template/1"
+            echo ""
+            
+            echo ""; echo "=== 6. Verify reset ==="
+            curl -s -b /tmp/cj "$BASE/api/sequence/templates" > /tmp/tpl.json
+            python3 << 'PYEOF3'
+          import json
+          with open('/tmp/tpl.json') as f: d = json.load(f)
+          for t in d:
+              if t['step']==1:
+                  print(f'step1 reset: edited={t.get("edited")}, subj={t["subject"][:80]}')
+          PYEOF3
+            
+            echo ""; echo "=== 7. Audit ALL 5 templates for assumption phrases ==="
+            python3 << 'PYEOF4'
+          import json
+          with open('/tmp/tpl.json') as f: d = json.load(f)
+          bad = ['their tenants', '1 in 323', '43% of m365', '61% of smbs were breached', 'your tenant']
+          all_clean = True
+          for t in d:
+              c = (t['body'] + ' ' + t['subject']).lower()
+              found = [p for p in bad if p in c]
+              if found:
+                  print(f'step{t["step"]}: FOUND {found}')
+                  all_clean = False
+              else:
+                  print(f'step{t["step"]}: CLEAN')
+          print('\nOVERALL:', 'ALL CLEAN ✓' if all_clean else 'HAS ASSUMPTIONS ✗')
+          PYEOF4
+          } > test_result.txt 2>&1
+          cat test_result.txt
+          exit 0
+      - run: |
+          git config user.email "test@bot.com"
+          git config user.name "Test Bot"
+          git add test_result.txt
+          git commit -m "test result [skip ci]"
+          git push
