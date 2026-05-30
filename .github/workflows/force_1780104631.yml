@@ -1,0 +1,16 @@
+name: Force1780104631
+on: { workflow_dispatch: , push: { paths: ['force_run.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 force_run.py
+        continue-on-error: true
+      - run: |
+          git config user.email "b@s.c"; git config user.name "B"
+          git add -f force_*.txt 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "force [skip ci]"
+          git push || true
