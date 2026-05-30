@@ -1998,7 +1998,8 @@ def save_template():
     if len(body) > 200000:
         return jsonify({"error": "body too long (max 200k chars)"}), 400
     
-    user = session.get("user", "admin")
+    from flask import session as _session
+    user = _session.get("user", "admin") if _session else "admin"
     try:
         conn = get_db()
         if USE_POSTGRES:
