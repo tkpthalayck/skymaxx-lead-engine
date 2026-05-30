@@ -536,6 +536,58 @@ SEQUENCE_TEMPLATES = [
         'body':       '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><meta http-equiv="X-UA-Compatible" content="IE=edge" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="format-detection" content="telephone=no, date=no, address=no, email=no" /><title>SKYMAXX Technologies</title><!--[if mso]><xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]--><style type="text/css">body{margin:0!important;padding:0!important;width:100%!important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;mso-line-height-rule:exactly}table{border-collapse:collapse!important;mso-table-lspace:0pt;mso-table-rspace:0pt}img{-ms-interpolation-mode:bicubic;border:0;outline:none;text-decoration:none;display:block}a{text-decoration:none}</style></head><body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;mso-line-height-rule:exactly"><div style="display:none;max-height:0;overflow:hidden;mso-hide:all">Final note plus useful resources you can keep regardless</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f4f6"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:600px"><tr><td bgcolor="#0f172a" style="background-color:#0f172a;padding:20px 32px;mso-line-height-rule:exactly;line-height:1.2"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse"><tr><td valign="middle" width="76" style="padding-right:14px;width:76px"><img src="https://skymaxx-lead-engine.onrender.com/static/logo_email.png" alt="SKYMAXX" width="60" height="60" style="display:block;width:60px;height:60px;max-width:60px;border-radius:50%;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic" /></td><td valign="middle" style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;font-family:Arial,Helvetica,sans-serif;mso-line-height-rule:exactly;line-height:1.2">SKYMAXX <span style="color:#60a5fa;font-weight:500">TECHNOLOGIES</span><div style="color:#cbd5e1;font-size:12px;font-weight:500;margin-top:2px;font-family:Arial,Helvetica,sans-serif">Microsoft 365 Specialists</div></td></tr></table></td></tr><tr><td style="padding:32px 36px;font-family:Arial,Helvetica,sans-serif;color:#1f2937;font-size:15px;line-height:1.6"><p style="margin:0 0 16px">Hi {{name}},</p><p style="margin:0 0 16px">This will be my last note for now &mdash; I do not want to crowd your inbox.</p><p style="margin:0 0 12px">To leave you with something useful, here are four resources worth bookmarking regardless of whether we ever speak:</p><ol style="margin:0 0 16px;padding-left:22px"><li style="margin-bottom:6px"><strong>Microsoft Secure Score</strong> &mdash; free dashboard showing tenant security posture for Office 365 users: <a href="https://security.microsoft.com" style="color:#2563eb">security.microsoft.com</a></li><li style="margin-bottom:6px"><strong>Microsoft 365 Admin Center licensing report</strong> &mdash; shows assigned vs active users (if you have an Office 365 tenant)</li><li style="margin-bottom:6px"><strong>Have I Been Pwned</strong> &mdash; check if any of your domain addresses are in known breaches: <a href="https://haveibeenpwned.com" style="color:#2563eb">haveibeenpwned.com</a></li><li style="margin-bottom:0"><strong>CISA cybersecurity guides for SMBs</strong> &mdash; practical, vendor-neutral guidance: <a href="https://cisa.gov/cybersecurity" style="color:#2563eb">cisa.gov/cybersecurity</a></li></ol><p style="margin:0 0 16px">If circumstances change and you would like to discuss Office 365 Email Services for {{company}}, or have us conduct a one-day assessment of your existing environment, just reply to this email.</p><p style="margin:0 0 4px">Best regards,</p><p style="margin:0;font-weight:600">SKYMAXX Support Team</p><p style="margin:0;color:#64748b;font-size:13px">SKYMAXX Technologies &middot; support@skymaxx.company</p></td></tr><tr><td style="background:#0f172a;padding:18px 36px;color:#94a3b8;font-size:11px;line-height:1.5;font-family:Arial,Helvetica,sans-serif"><p style="margin:0">SKYMAXX Technologies &middot; Microsoft 365 Management for SMBs &middot; UAE</p><p style="margin:6px 0 0"><a href="mailto:support@skymaxx.company" style="color:#60a5fa;text-decoration:none">support@skymaxx.company</a> &middot; If you prefer not to receive these messages, just reply with "unsubscribe" and we will remove you immediately.</p></td></tr></table></td></tr></table></body></html>',
     },
 ]
+
+
+# ── Template Overrides (DB-stored edits to SEQUENCE_TEMPLATES) ──
+def get_template_overrides():
+    """Returns {step: {'subject': ..., 'body': ..., 'updated_at': ..., 'updated_by': ...}}"""
+    try:
+        conn = get_db()
+        cur = conn.execute("SELECT step, subject, body, updated_at, updated_by FROM template_overrides")
+        rows = cur.fetchall()
+        if hasattr(conn, 'close'):
+            try: conn.close()
+            except Exception: pass
+        result = {}
+        for r in rows:
+            step = r[0] if not isinstance(r, dict) else r['step']
+            result[step] = {
+                'subject':    r[1] if not isinstance(r, dict) else r['subject'],
+                'body':       r[2] if not isinstance(r, dict) else r['body'],
+                'updated_at': str(r[3]) if r[3] and not isinstance(r, dict) else (str(r['updated_at']) if isinstance(r, dict) and r['updated_at'] else None),
+                'updated_by': r[4] if not isinstance(r, dict) else r.get('updated_by'),
+            }
+        return result
+    except Exception as e:
+        print(f"[get_template_overrides] err: {e}")
+        return {}
+
+def get_effective_templates():
+    """Returns SEQUENCE_TEMPLATES with DB overrides applied. Each template gets 'edited': bool flag."""
+    overrides = get_template_overrides()
+    result = []
+    for tpl in SEQUENCE_TEMPLATES:
+        step = tpl['step']
+        merged = dict(tpl)
+        if step in overrides:
+            ov = overrides[step]
+            if ov.get('subject'): merged['subject'] = ov['subject']
+            if ov.get('body'):    merged['body']    = ov['body']
+            merged['edited']      = True
+            merged['edited_at']   = ov.get('updated_at')
+            merged['edited_by']   = ov.get('updated_by')
+        else:
+            merged['edited'] = False
+        result.append(merged)
+    return result
+
+def get_effective_template_for_step(step):
+    """Returns the merged template for a single step, or None if step invalid."""
+    for tpl in get_effective_templates():
+        if tpl['step'] == step:
+            return tpl
+    return None
+
 # Auto-reply template
 AUTO_REPLY_TEMPLATE = {
     'subject': 'We received your message \u2014 SKYMAXX Technologies',
@@ -719,6 +771,13 @@ def _init_pg_schema(conn):
         )""",
         "ALTER TABLE leads ADD COLUMN IF NOT EXISTS company TEXT",
         "ALTER TABLE leads ADD COLUMN IF NOT EXISTS title TEXT",
+        """CREATE TABLE IF NOT EXISTS template_overrides (
+            step INTEGER PRIMARY KEY,
+            subject TEXT,
+            body TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_by TEXT
+        )""",
         "CREATE INDEX IF NOT EXISTS idx_leads_sequence ON leads(in_sequence, next_send_at)",
         "CREATE INDEX IF NOT EXISTS idx_log_sent_at ON email_log(sent_at)",
         "CREATE INDEX IF NOT EXISTS idx_track_log ON tracking_events(log_id)",
@@ -863,6 +922,13 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_track_event ON tracking_events(event_type);
         CREATE INDEX IF NOT EXISTS idx_lga_lead ON lead_group_assignments(lead_id);
         CREATE INDEX IF NOT EXISTS idx_lga_group ON lead_group_assignments(group_id);
+        CREATE TABLE IF NOT EXISTS template_overrides (
+            step INTEGER PRIMARY KEY,
+            subject TEXT,
+            body TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_by TEXT
+        );
     """)
 
     # Migration: add source column if missing
@@ -1157,6 +1223,8 @@ def _places_text_search_paginated(query, max_pages=3, max_results=60):
 
 
 def process_pending_sends(max_per_run=None):
+
+    _effective_templates = get_effective_templates()  # apply DB overrides
     today_count = get_todays_send_count()
     if today_count >= DAILY_SEND_LIMIT:
         return
@@ -1180,7 +1248,7 @@ def process_pending_sends(max_per_run=None):
     for lead in pending:
         next_step = lead["sequence_step"] + 1
         if next_step > 5: continue
-        tpl = SEQUENCE_TEMPLATES[next_step - 1]
+        tpl = _effective_templates[next_step - 1]
         subject = personalize(tpl["subject"], lead)
         body    = personalize(tpl["body"],    lead)
 
@@ -1218,7 +1286,7 @@ def process_pending_sends(max_per_run=None):
                 conn.execute("UPDATE leads SET sequence_step=?, in_sequence=0 WHERE id=?",
                              [next_step, lead["id"]])
             else:
-                next_tpl = SEQUENCE_TEMPLATES[next_step]
+                next_tpl = _effective_templates[next_step]
                 next_at = (datetime.utcnow() + timedelta(days=next_tpl["delay_days"])).isoformat()
                 conn.execute("UPDATE leads SET sequence_step=?, next_send_at=? WHERE id=?",
                              [next_step, next_at, lead["id"]])
@@ -1911,8 +1979,67 @@ def debug_db():
         info["db_query_error"] = str(e)[:300]
     return jsonify(info)
 
+@app.route("/api/sequence/save_template", methods=["POST"])
+def save_template():
+    """Persist a manual edit to a sequence template. Body: {step, subject, body}."""
+    data = request.json or {}
+    try:
+        step = int(data.get("step", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid step"}), 400
+    subject = (data.get("subject") or "").strip()
+    body    = (data.get("body") or "").strip()
+    if not (1 <= step <= len(SEQUENCE_TEMPLATES)):
+        return jsonify({"error": f"step must be 1..{len(SEQUENCE_TEMPLATES)}"}), 400
+    if not subject or not body:
+        return jsonify({"error": "subject and body are required"}), 400
+    if len(subject) > 500:
+        return jsonify({"error": "subject too long (max 500 chars)"}), 400
+    if len(body) > 200000:
+        return jsonify({"error": "body too long (max 200k chars)"}), 400
+    
+    user = session.get("user", "admin")
+    try:
+        conn = get_db()
+        if USE_POSTGRES:
+            conn.execute(
+                """INSERT INTO template_overrides (step, subject, body, updated_at, updated_by)
+                   VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s)
+                   ON CONFLICT (step) DO UPDATE SET subject=EXCLUDED.subject, body=EXCLUDED.body,
+                       updated_at=CURRENT_TIMESTAMP, updated_by=EXCLUDED.updated_by""",
+                (step, subject, body, user))
+        else:
+            conn.execute("DELETE FROM template_overrides WHERE step=?", (step,))
+            conn.execute(
+                "INSERT INTO template_overrides (step, subject, body, updated_by) VALUES (?,?,?,?)",
+                (step, subject, body, user))
+        conn.commit()
+        try: conn.close()
+        except Exception: pass
+        return jsonify({"ok": True, "step": step, "saved_by": user})
+    except Exception as e:
+        return jsonify({"error": f"save failed: {e}"}), 500
+
+@app.route("/api/sequence/reset_template/<int:step>", methods=["POST"])
+def reset_template(step):
+    """Remove the override for a step, reverting to the code default."""
+    if not (1 <= step <= len(SEQUENCE_TEMPLATES)):
+        return jsonify({"error": f"step must be 1..{len(SEQUENCE_TEMPLATES)}"}), 400
+    try:
+        conn = get_db()
+        if USE_POSTGRES:
+            conn.execute("DELETE FROM template_overrides WHERE step=%s", (step,))
+        else:
+            conn.execute("DELETE FROM template_overrides WHERE step=?", (step,))
+        conn.commit()
+        try: conn.close()
+        except Exception: pass
+        return jsonify({"ok": True, "step": step})
+    except Exception as e:
+        return jsonify({"error": f"reset failed: {e}"}), 500
+
 @app.route("/api/sequence/templates")
-def get_templates(): return jsonify(SEQUENCE_TEMPLATES)
+def get_templates(): return jsonify(get_effective_templates())
 
 # ── LEAD SEARCH (Google Maps) ──
 @app.route("/api/search", methods=["POST"])
@@ -2274,7 +2401,7 @@ def set_step():
     next_step = step + 1
     if next_step > 5:
         return jsonify({"error": "step must be 1-4"}), 400
-    next_tpl = SEQUENCE_TEMPLATES[next_step - 1]
+    next_tpl = get_effective_template_for_step(next_step)
     next_at = (datetime.utcnow() + timedelta(days=next_tpl["delay_days"])).isoformat()
     
     updated = 0
@@ -2319,7 +2446,7 @@ def template_preview(step):
     if not (1 <= step <= len(SEQUENCE_TEMPLATES)):
         return jsonify({"error": "invalid step"}), 400
     name = request.args.get("name", "Sarah Johnson")
-    tpl = SEQUENCE_TEMPLATES[step - 1]
+    tpl = get_effective_template_for_step(step)
     fake_lead = {"name": name, "city": "Dubai", "website": "example.com"}
     return jsonify({
         "step":    tpl["step"],
@@ -2341,7 +2468,7 @@ def send_test_email():
         return jsonify({"error": "invalid email"}), 400
     if not (1 <= step <= len(SEQUENCE_TEMPLATES)):
         return jsonify({"error": "invalid step"}), 400
-    tpl = SEQUENCE_TEMPLATES[step - 1]
+    tpl = get_effective_template_for_step(step)
     fake_lead = {"name": test_name, "city": "Dubai"}
     subject = "[TEST] " + personalize(tpl["subject"], fake_lead)
     body    = personalize(tpl["body"], fake_lead)
@@ -2601,7 +2728,7 @@ def list_campaigns():
                     lead_ids + [step_num]).fetchone()[0]
                 # Get template name + delay for this step
                 try:
-                    tpl = SEQUENCE_TEMPLATES[step_num - 1]
+                    tpl = get_effective_template_for_step(step_num)
                     step_name = tpl.get('name', f'Email {step_num}')
                 except Exception:
                     step_name = f'Email {step_num}'
@@ -3279,7 +3406,7 @@ def analytics_by_step():
             JOIN email_log el ON te.log_id=el.id WHERE el.step=? AND te.event_type='click'""", [step]).fetchone()[0]
         pct = lambda n, d: round(n*100.0/d, 1) if d else 0
         rows.append({
-            "step": step, "name": SEQUENCE_TEMPLATES[step-1]["name"],
+            "step": step, "name": get_effective_template_for_step(step)["name"],
             "sent": sent, "opens": opens, "clicks": clicks,
             "open_rate": pct(opens, sent), "click_rate": pct(clicks, sent),
         })
