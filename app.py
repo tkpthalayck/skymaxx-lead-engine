@@ -69,6 +69,17 @@ def require_auth():
     return redirect(url_for("login"))
 
 
+
+@app.before_request
+def _piggyback_cron_hook():
+    """Triggers process_pending_sends in background on API requests — keeps email sequence engine moving."""
+    try:
+        if request.path.startswith('/api/') and not request.path.startswith('/api/cron'):
+            _piggyback_cron_check()
+    except Exception as e:
+        print(f"[piggyback-hook] err: {e}")
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     from flask import session, request, redirect, url_for, render_template_string
