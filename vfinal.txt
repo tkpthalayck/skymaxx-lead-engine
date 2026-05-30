@@ -1,0 +1,16 @@
+=================================================================
+FINAL VERIFICATION
+=================================================================
+Login OK
+
+1. LOGO TRANSPARENCY
+  /static/logo.png: HTTP 200 | 280,874 bytes
+  PNG color type: 6 (RGBA)
+  CHECK Has alpha (transparent corners)
+
+2. SEND A TEST EMAIL TO CONFIRM NEW TEMPLATE
+  Running/approved campaigns: 4
+  /api/sequence/queue: HTTP 200, first 500 chars: {"upcoming":[{"city":"","email":"info@linkedin.com","name":"Sergey Barysiuk","next_send_at":"2026-05-30T02:40:25.702995","sequence_step":1},{"city":"","email":"abarak@maximaapparel.com","name":"Aaron Barak","next_send_at":"2026-05-30T02:40:28.400745","sequence_step":1},{"city":"","email":"chris.kuch
+
+3. RECENT EMAIL_LOG (check sent email HTML)
+  queue response: {'upcoming': [{'city': '', 'email': 'info@linkedin.com', 'name': 'Sergey Barysiuk', 'next_send_at': '2026-05-30T02:40:25.702995', 'sequence_step': 1}, {'city': '', 'email': 'abarak@maximaapparel.com', 'name': 'Aaron Barak', 'next_send_at': '2026-05-30T02:40:28.400745', 'sequence_step': 1}, {'city': 
