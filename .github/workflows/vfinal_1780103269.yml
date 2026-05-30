@@ -1,0 +1,16 @@
+name: VFinal1780103269
+on: { workflow_dispatch: , push: { paths: ['vfinal.py'] } }
+permissions: { contents: write }
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 vfinal.py
+        continue-on-error: true
+      - run: |
+          git config user.email "b@s.c"; git config user.name "B"
+          git add -f vfinal.txt 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "vfinal [skip ci]"
+          git push || true
