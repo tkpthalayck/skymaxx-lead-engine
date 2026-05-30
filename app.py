@@ -1268,6 +1268,126 @@ def admin_diag():
     return jsonify(report)
 
 
+
+
+@app.route("/api/admin/force_send_one", methods=["POST"])
+def admin_force_send_one():
+    """Force-advance ONE lead's next_send_at to now and immediately process sequence sends.
+    Use this to verify end-to-end that the sequence engine actually progresses to step 2+.
+    
+    POST body: {"lead_id": 123}  OR  {"campaign_id": 1, "limit": 1}
+    """
+    data = request.json or {}
+    lead_id = data.get("lead_id")
+    campaign_id = data.get("campaign_id")
+    limit = int(data.get("limit") or 1)
+    
+    conn = get_db()
+    if lead_id:
+        rows = rows_to_list(conn.execute(
+            "SELECT id, name, email, sequence_step, next_send_at FROM leads WHERE id=?",
+            [lead_id]).fetchall())
+    elif campaign_id:
+        # Find lead_ids_json for the campaign
+        row = conn.execute("SELECT lead_ids_json FROM campaigns WHERE id=?", [campaign_id]).fetchone()
+        try:
+            lids = json.loads(row[0]) if row and row[0] else []
+            lids = [int(x) for x in lids]
+        except: lids = []
+        if not lids:
+            conn.close()
+            return jsonify({"error": "No leads in that campaign"}), 400
+        # Get first N leads that are pending
+        ph = ",".join("?" * len(lids))
+        rows = rows_to_list(conn.execute(
+            f"""SELECT id, name, email, sequence_step, next_send_at FROM leads
+                WHERE id IN ({ph}) AND in_sequence=1 AND replied=0 AND unsubscribed=0
+                AND sequence_step < 5 ORDER BY id LIMIT ?""",
+            lids + [limit]).fetchall())
+    else:
+        conn.close()
+        return jsonify({"error": "Provide lead_id or campaign_id"}), 400
+    
+    if not rows:
+        conn.close()
+        return jsonify({"error": "No eligible leads found"}), 404
+    
+    # Force their next_send_at to 1 minute ago
+    now_minus_1min = (datetime.utcnow() - timedelta(minutes=1)).isoformat()
+    target_ids = [r["id"] for r in rows]
+    ph = ",".join("?" * len(target_ids))
+    conn.execute(f"UPDATE leads SET next_send_at=? WHERE id IN ({ph})",
+                 [now_minus_1min] + target_ids)
+    conn.commit()
+    conn.close()
+    
+    # Snapshot BEFORE state
+    before = []
+    for r in rows:
+        before.append({"id": r["id"], "name": r.get("name"), "step": r.get("sequence_step"),
+                       "next_send_at": r.get("next_send_at")})
+    
+    # Run process_pending_sends with limit
+    try:
+        process_pending_sends(max_per_run=limit)
+    except Exception as e:
+        return jsonify({"error": "process_pending_sends raised", "detail": str(e)}), 500
+    
+    # Snapshot AFTER state
+    conn = get_db()
+    after = rows_to_list(conn.execute(
+        f"SELECT id, name, sequence_step, next_send_at, in_sequence FROM leads WHERE id IN ({ph})",
+        target_ids).fetchall())
+    # Get fresh email_log entries
+    logs = rows_to_list(conn.execute(
+        f"""SELECT id, lead_id, step, to_email, subject, status, error_msg, sent_at
+            FROM email_log WHERE lead_id IN ({ph}) ORDER BY id DESC LIMIT 10""",
+        target_ids).fetchall())
+    conn.close()
+    
+    return jsonify({
+        "before": before,
+        "after": after,
+        "recent_logs": logs,
+        "triggered_at": now_minus_1min,
+        "note": "Forced next_send_at to 1 min ago, then ran process_pending_sends"
+    })
+
+@app.route("/api/admin/cron_trigger", methods=["POST"])
+def admin_cron_trigger():
+    """Manually trigger the cron processor and return what it did."""
+    before = None
+    try:
+        conn = get_db()
+        before = conn.execute(
+            "SELECT COUNT(*) FROM email_log").fetchone()[0]
+        conn.close()
+    except: pass
+    
+    try:
+        process_pending_sends()
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+    after = None
+    try:
+        conn = get_db()
+        after = conn.execute("SELECT COUNT(*) FROM email_log").fetchone()[0]
+        # Get most recent log entries
+        recent = rows_to_list(conn.execute(
+            "SELECT id, lead_id, step, to_email, status, sent_at FROM email_log ORDER BY id DESC LIMIT 5"
+        ).fetchall())
+        conn.close()
+    except: pass
+    
+    return jsonify({
+        "email_log_before": before,
+        "email_log_after": after,
+        "sent_this_run": (after - before) if (before is not None and after is not None) else None,
+        "recent_logs": recent if 'recent' in dir() else []
+    })
+
+
 @app.route("/api/cron/process", methods=["GET", "POST"])
 def cron_process():
     """External-cron-driven processor. Call from cron-job.com every 5 min.
