@@ -1,40 +1,35 @@
-=== Login ===
-HTTP 200
-    <title>SKYMAXX Login</title>
-      .error{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:16px}
-      <div class="error">Invalid username or password</div>
+=== 1. Login (admin/SKYMAXX@2026) ===
+HTTP 302
+Cookies:
+#HttpOnly_skymaxx-lead-engine.onrender.com	FALSE	/	TRUE	1782744355	session	eyJfcGVybWFuZW50Ijp0cnVlLCJ1c2VyIjoiYWRtaW4ifQ.ahr4Iw.zQtbeII3DD0u4A4IGqfwZSAKyIM
 
-=== Cookies set ===
+=== 2. GET /api/sequence/templates ===
+OK: 5 templates
+  step1: edited=False | subj=Office 365 Email Services for {{company}} - productivity, securit
+  step2: edited=False | subj=A practical look at Office 365 Email Services
+  step3: edited=False | subj=What our one-day email assessment covers
+  step4: edited=False | subj=Why email infrastructure matters for {{company}}
+  step5: edited=False | subj=Closing the loop - and 4 free resources for {{company}}
+
+=== 3. POST save_template (step 1 edit) ===
+{"detail":"name 'session' is not defined","error":"NameError"}
 
 
-=== GET /api/sequence/templates ===
-HTTP 401
-  File "<string>", line 9
-    print(f"  step{t[\"step\"]}: edited={t.get(\"edited\")}, subj={t[\"subject\"][:65]}")
-                      ^
-SyntaxError: unexpected character after line continuation character
+=== 4. Verify edit ===
+step1: edited=False, by=None, subj=Office 365 Email Services for {{company}} - productivity, security, cost, body_start=<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//E
 
-=== POST save_template (step 1) ===
-{"error":"unauthorized","login_url":"/login"}
+=== 5. Reset step 1 ===
+{"ok":true,"step":1}
 
-HTTP 401
 
-=== Verify edit ===
-Traceback (most recent call last):
-  File "<string>", line 4, in <module>
-TypeError: string indices must be integers, not 'str'
+=== 6. Verify reset ===
+step1 reset: edited=False, subj=Office 365 Email Services for {{company}} - productivity, security, cost
 
-=== Reset step 1 ===
-{"error":"unauthorized","login_url":"/login"}
+=== 7. Audit ALL 5 templates for assumption phrases ===
+step1: CLEAN
+step2: CLEAN
+step3: CLEAN
+step4: CLEAN
+step5: CLEAN
 
-HTTP 401
-
-=== Verify reset ===
-Traceback (most recent call last):
-  File "<string>", line 4, in <module>
-TypeError: string indices must be integers, not 'str'
-
-=== Audit ALL templates for assumption phrases ===
-Traceback (most recent call last):
-  File "<string>", line 5, in <module>
-TypeError: string indices must be integers, not 'str'
+OVERALL: ALL CLEAN ✓
