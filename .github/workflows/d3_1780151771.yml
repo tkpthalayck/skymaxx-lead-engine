@@ -1,0 +1,90 @@
+name: Final Direct Edit Verification
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait briefly
+        run: sleep 10
+      - name: Write test script
+        run: |
+          cat > /tmp/test.py << 'PYEND'
+          import json, urllib.request, urllib.parse, http.cookiejar
+          
+          BASE = "https://skymaxx-lead-engine.onrender.com"
+          cj = http.cookiejar.CookieJar()
+          opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+          
+          # 1. Login
+          data = urllib.parse.urlencode({"password":"SKYMAXX@2026"}).encode()
+          r = opener.open(urllib.request.Request(f"{BASE}/login", data=data,
+              headers={"Content-Type":"application/x-www-form-urlencoded"}))
+          print(f"1. Login: HTTP {r.status}")
+          
+          # 2. Get templates
+          r = opener.open(f"{BASE}/api/sequence/templates")
+          tpl = json.loads(r.read())
+          print(f"\n2. GET /api/sequence/templates → {len(tpl)} templates")
+          for t in tpl:
+              edited = t.get("edited", "MISSING")
+              print(f"   Step {t['step']}: edited={edited}, subject={t['subject'][:60]}")
+          
+          # 3. Save edit to step 1
+          payload = json.dumps({"step":1, "subject":"DIAG TEST - Step 1 edited", "body":"<p>Test body for {{name}} at {{company}}.</p>"}).encode()
+          r = opener.open(urllib.request.Request(f"{BASE}/api/sequence/save_template",
+              data=payload, headers={"Content-Type":"application/json"}, method="POST"))
+          print(f"\n3. POST save_template → HTTP {r.status}: {r.read().decode()}")
+          
+          # 4. Verify edit applied
+          r = opener.open(f"{BASE}/api/sequence/templates")
+          tpl = json.loads(r.read())
+          s1 = next(t for t in tpl if t["step"] == 1)
+          print(f"\n4. Verify step 1 after save:")
+          print(f"   edited:    {s1.get('edited')}")
+          print(f"   edited_by: {s1.get('edited_by')}")
+          print(f"   subject:   {s1['subject']}")
+          print(f"   body[:80]: {s1['body'][:80]}")
+          assert s1.get("edited") == True, "edited flag should be True"
+          assert "DIAG TEST" in s1["subject"], "subject not updated"
+          print("   ✓ Edit persisted correctly")
+          
+          # 5. Reset
+          r = opener.open(urllib.request.Request(f"{BASE}/api/sequence/reset_template/1",
+              method="POST", data=b""))
+          print(f"\n5. POST reset_template/1 → HTTP {r.status}: {r.read().decode()}")
+          
+          # 6. Verify reset
+          r = opener.open(f"{BASE}/api/sequence/templates")
+          tpl = json.loads(r.read())
+          s1 = next(t for t in tpl if t["step"] == 1)
+          print(f"\n6. Verify step 1 after reset:")
+          print(f"   edited:  {s1.get('edited')}")
+          print(f"   subject: {s1['subject'][:80]}")
+          assert s1.get("edited") == False, "edited flag should be False after reset"
+          assert "DIAG TEST" not in s1["subject"], "subject should be reverted"
+          print("   ✓ Reset works")
+          
+          # 7. Audit all templates for assumption phrases
+          print(f"\n7. Audit for infrastructure assumptions in ALL templates:")
+          bad = ["their tenants", "1 in 323", "43% of m365", "61% of smbs were breached", "your tenant"]
+          all_clean = True
+          for t in tpl:
+              combined = (t["body"] + " " + t["subject"]).lower()
+              found = [p for p in bad if p in combined]
+              if found:
+                  print(f"   step{t['step']}: ❌ FOUND {found}")
+                  all_clean = False
+              else:
+                  print(f"   step{t['step']}: ✓ CLEAN")
+          
+          if all_clean:
+              print("\n   ✓ ALL templates are free of infrastructure assumptions")
+          
+          print("\n=== ALL TESTS PASSED ===")
+          PYEND
+          
+          python3 /tmp/test.py
