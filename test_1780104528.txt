@@ -1,0 +1,18 @@
+Login OK
+
+======================================================================
+LIVE END-TO-END TEST: Force progression from step 1 to step 2
+======================================================================
+Picking ONE lead from Campaign #1 (your oldest campaign)
+Setting next_send_at to 1 minute ago
+Running cron logic — should send EMAIL #2 to that lead
+
+BEFORE state:
+  Lead #59: Aaron Barak                         | step=1 | next_send_at=2026-05-30T02:40:28.400745
+
+AFTER cron run:
+  Lead #59: Aaron Barak                         | step=2 | next_send_at=2026-06-03T01:28:46.301128 | in_seq=1
+
+FRESH EMAIL_LOG (most recent 10 for this lead):
+  log_id=54    step=2 | abarak@maximaapparel.com            | status=success  | sent_at=Sat, 30 May 2026 01:28:45 GMT
+  log_id=2     step=1 | abarak@maximaapparel.com            | status=success  | sent_at=Wed, 27 May 2026 02:40:27 GMT
