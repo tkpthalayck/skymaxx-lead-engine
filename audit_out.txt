@@ -1,0 +1,109 @@
+════ DASHBOARD STATS AUDIT 06:56:58 ════
+Login: 302
+
+── /api/stats ──
+{
+    "bcc_support": true,
+    "daily_limit": 300,
+    "in_sequence": 141,
+    "replied": 0,
+    "today_sent": 0,
+    "total_failed": 0,
+    "total_leads": 146,
+    "total_sent": 170,
+    "with_email": 146
+}
+
+── /api/admin/diag (full DB breakdown if exists) ──
+{
+    "campaigns": [
+        {
+            "actually_sent": 39,
+            "created_at": "Sat, 30 May 2026 17:50:56 GMT",
+            "id": 8,
+            "lead_count": 25,
+            "name": "Outreach 5/30/2026",
+            "recipient_count": 25,
+            "status": "running"
+        },
+        {
+            "actually_sent": 50,
+            "created_at": "Sat, 30 May 2026 02:56:34 GMT",
+            "id": 7,
+            "lead_count": 50,
+            "name": "Outreach 5/30/2026",
+            "recipient_count": 50,
+            "status": "running"
+        },
+        {
+            "actually_sent": 13,
+            "created_at": "Sat, 30 May 2026 02:00:46 GMT",
+            "id": 6,
+            "lead_count": 13,
+            "name": "Outreach 5/30/2026",
+            "recipient_count": 13,
+            "status": "running"
+        },
+        {
+            "actually_sent": 15,
+            "created_at": "Fri, 29 May 2026 20:08:05 GMT",
+            "id": 5,
+            "lead_count": 15,
+            "name": "Outreach 5/30/2026",
+            "recipient_count": 15,
+            "status": "running"
+        },
+        {
+            "actually_sent": 19,
+            "created_at": "Fri, 29 May 2026 13:25:22 GMT",
+            "id": 4,
+            "lead_count": 19,
+            "name": "Outreach 5/29/2026",
+            "recipient_count": 19,
+            "status": "running"
+        },
+        {
+            "actually_sent": 5,
+            "created_at": "Fri, 29 May 2026 13:05:19 GMT",
+            "id": 3,
+            "lead_count": 5,
+            "name": "Outreach 5/29/2026",
+            "recipient_count": 5,
+            "status": "running"
+        },
+        {
+            "actually_sent": 29,
+            "created_at": "Mon, 25 May 2026 13:22:04 GMT",
+            "id": 1,
+            "lead_count": 14,
+            "name": "Outreach 5/25/2026",
+            "recipient_count": 14,
+            "status": "running"
+        }
+    ],
+    "daily_limit": 300,
+    "email_log_by_step": [
+        {
+            "cnt": 155,
+            "status": "success",
+            "step": 1
+        },
+        {
+            "cnt": 14,
+            "status": "success",
+            "step": 2
+        },
+        {
+            "cnt": 1,
+
+── /api/campaigns counters ──
+  #8 Outreach 5/30/2026             | dom=skymaxx    | status=running        | sent=39 failed=0
+  #7 Outreach 5/30/2026             | dom=skymaxx    | status=running        | sent=50 failed=0
+  #6 Outreach 5/30/2026             | dom=skymaxx    | status=running        | sent=13 failed=0
+  #5 Outreach 5/30/2026             | dom=skymaxx    | status=running        | sent=15 failed=0
+  #4 Outreach 5/29/2026             | dom=skymaxx    | status=running        | sent=19 failed=0
+  #3 Outreach 5/29/2026             | dom=skymaxx    | status=running        | sent=5 failed=0
+  #1 Outreach 5/25/2026             | dom=skymaxx    | status=running        | sent=29 failed=0
+
+  SUM actually_sent across campaigns: 170
+  SUM actually_failed across campaigns: 0
