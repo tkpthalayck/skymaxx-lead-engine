@@ -1,0 +1,46 @@
+════════ HEALTH ENDPOINT ANONYMOUS TEST 07:11:28 ════════
+(Simulating what UptimeRobot does — no cookies, no auth)
+
+── 1. HEAD /api/health (some monitors use HEAD) ──
+  Status: 200  TimeTotal: 0.401241s
+
+── 2. GET /api/health (anonymous, full response) ──
+{"db":"ok","db_latency_ms":267,"service":"skymaxx-lead-engine","status":"ok","ts":1780211488}
+
+  HTTP=200 time=0.395228s size=94b
+
+── 3. With User-Agent like UptimeRobot ──
+{"db":"ok","db_latency_ms":52,"service":"skymaxx-lead-engine","status":"ok","ts":1780211489}
+
+  HTTP=200 time=0.191683s
+
+── 4. With keyword check (UptimeRobot can look for 'status':'ok') ──
+  Full body: {"db":"ok","db_latency_ms":13,"service":"skymaxx-lead-engine","status":"ok","ts":1780211489}
+  ✓ Keyword "status":"ok" PRESENT
+
+── 5. Test from external probe IP simulation (DNS resolution) ──
+Using domain server:
+Name: 8.8.8.8
+Address: 8.8.8.8#53
+Aliases: 
+
+skymaxx-lead-engine.onrender.com is an alias for gcp-us-west1-1.origin.onrender.com.
+gcp-us-west1-1.origin.onrender.com is an alias for gcp-us-west1-1.origin.onrender.com.cdn.cloudflare.net.
+gcp-us-west1-1.origin.onrender.com.cdn.cloudflare.net has address 216.24.57.7
+gcp-us-west1-1.origin.onrender.com.cdn.cloudflare.net has address 216.24.57.251
+
+── 6. SSL certificate check ──
+notBefore=May 26 21:02:15 2026 GMT
+notAfter=Aug 24 22:01:50 2026 GMT
+subject=CN = onrender.com
+
+── 7. Try POST to /api/health (some monitor configs do this; should still work or 405) ──
+{"error":"unauthorized","login_url":"/login"}
+
+  POST HTTP=401
+
+── 8. Check if redirect chain interferes ──
+  Final URL: https://skymaxx-lead-engine.onrender.com/api/health
+  Total redirects: 0
+
+════════ DIAGNOSIS ════════
