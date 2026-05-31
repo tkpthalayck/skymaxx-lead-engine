@@ -1,0 +1,50 @@
+name: Stats Audit
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          set +e
+          BASE="https://skymaxx-lead-engine.onrender.com"
+          {
+            echo "════ DASHBOARD STATS AUDIT $(date -u +%H:%M:%S) ════"
+            curl -s -c /tmp/cj -X POST "$BASE/login" \
+              --data-urlencode "username=admin" --data-urlencode "password=SKYMAXX@2026" \
+              -o /dev/null -w "Login: %{http_code}\n"
+            
+            echo ""
+            echo "── /api/stats ──"
+            curl -s -b /tmp/cj "$BASE/api/stats" | python3 -m json.tool
+            
+            echo ""
+            echo "── /api/admin/diag (full DB breakdown if exists) ──"
+            curl -s -b /tmp/cj "$BASE/api/admin/diag" | python3 -m json.tool 2>/dev/null | head -80
+            
+            echo ""
+            echo "── /api/campaigns counters ──"
+            curl -s -b /tmp/cj "$BASE/api/campaigns" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          cs = d.get('campaigns', d) if isinstance(d, dict) else d
+          total_sent = 0; total_failed = 0
+          for c in (cs or []):
+              if isinstance(c, dict):
+                  total_sent += int(c.get('actually_sent',0) or 0)
+                  total_failed += int(c.get('actually_failed',0) or 0)
+                  print(f\"  #{c.get('id')} {c.get('name','')[:30]:30} | dom={c.get('domain_key','?'):10} | status={c.get('status','?'):14} | sent={c.get('actually_sent',0)} failed={c.get('actually_failed',0)}\")
+          print(f'\\n  SUM actually_sent across campaigns: {total_sent}')
+          print(f'  SUM actually_failed across campaigns: {total_failed}')"
+          } > audit_out.txt 2>&1
+          cat audit_out.txt
+          exit 0
+      - run: |
+          git config user.email "v@v.com"; git config user.name "V"
+          git add audit_out.txt
+          git commit -m "audit [skip ci]"
+          git push
