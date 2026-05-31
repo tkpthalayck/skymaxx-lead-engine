@@ -1,0 +1,41 @@
+=== raw /api/stats response ===
+* [HTTP/2] [1] OPENED stream for https://skymaxx-lead-engine.onrender.com/api/stats
+* [HTTP/2] [1] [:method: GET]
+* [HTTP/2] [1] [:scheme: https]
+* [HTTP/2] [1] [:authority: skymaxx-lead-engine.onrender.com]
+* [HTTP/2] [1] [:path: /api/stats]
+* [HTTP/2] [1] [user-agent: curl/8.5.0]
+* [HTTP/2] [1] [accept: */*]
+* [HTTP/2] [1] [cookie: session=eyJfcGVybWFuZW50Ijp0cnVlLCJ1c2VyIjoiYWRtaW4ifQ.ahvdfA.pWLcB2ovxM1O8reI7SnZVgSSzPI]
+} [5 bytes data]
+> GET /api/stats HTTP/2
+> Host: skymaxx-lead-engine.onrender.com
+> User-Agent: curl/8.5.0
+> Accept: */*
+> Cookie: session=eyJfcGVybWFuZW50Ijp0cnVlLCJ1c2VyIjoiYWRtaW4ifQ.ahvdfA.pWLcB2ovxM1O8reI7SnZVgSSzPI
+> 
+{ [5 bytes data]
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+{ [230 bytes data]
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+{ [230 bytes data]
+* old SSL session ID is stale, removing
+{ [5 bytes data]
+< HTTP/2 200 
+< date: Sun, 31 May 2026 07:04:31 GMT
+< content-type: application/json
+< access-control-allow-origin: *
+< cf-cache-status: DYNAMIC
+< rndr-id: feb9f22f-3669-440e
+< server: cloudflare
+* Replaced cookie session="eyJfcGVybWFuZW50Ijp0cnVlLCJ1c2VyIjoiYWRtaW4ifQ.ahvdfw.MYCdZqxg3NdoMqSmqOh1gCU7HT8" for domain skymaxx-lead-engine.onrender.com, path /, expire 1782803071
+< set-cookie: session=eyJfcGVybWFuZW50Ijp0cnVlLCJ1c2VyIjoiYWRtaW4ifQ.ahvdfw.MYCdZqxg3NdoMqSmqOh1gCU7HT8; Expires=Tue, 30 Jun 2026 07:04:31 GMT; Secure; HttpOnly; Path=/; SameSite=Lax
+< vary: Cookie
+< vary: Accept-Encoding
+< x-render-origin-server: gunicorn
+< cf-ray: a0441fec2d86f828-IAD
+< alt-svc: h3=":443"; ma=86400
+< 
+{ [623 bytes data]
+* Connection #0 to host skymaxx-lead-engine.onrender.com left intact
+{"active_campaigns":7,"active_campaigns_by_domain":{"royalgroups":0,"skymaxx":7,"toolsshopy":0},"as_of_utc":"2026-05-31T07:04:31.503421Z","bcc_support":true,"daily_limit":300,"in_sequence":141,"leads_by_domain":{"royalgroups":0,"skymaxx":146,"toolsshopy":0},"replied":0,"sent_by_domain":{"royalgroups":0,"skymaxx":170,"toolsshopy":0},"sent_last_7d":[{"count":14,"date":"2026-05-27"},{"count":39,"date":"2026-05-29"},{"count":117,"date":"2026-05-30"}],"today_sent":0,"today_sent_from_log":0,"total_campaigns":7,"total_failed":0,"total_groups":3,"total_leads":146,"total_sending_pending":0,"total_sent":170,"with_email":146}
