@@ -1,0 +1,113 @@
+name: UR Minimal Create
+on: { workflow_dispatch: }
+permissions: { contents: write }
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        env:
+          UR_KEY: 'u3525516-bfed29af5e19275b6d750d9f'
+          HEALTH_URL: 'https://skymaxx-lead-engine.onrender.com/api/health'
+        run: |
+          set +e
+          {
+            echo "════════ UPTIMEROBOT — BARE-MINIMUM CREATE TEST $(date -u +%H:%M:%S) ════════"
+            
+            echo ""
+            echo "── Variation A: only friendly_name + url + type ──"
+            curl -s -X POST "https://api.uptimerobot.com/v2/newMonitor" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              --data-urlencode "api_key=${UR_KEY}" \
+              --data-urlencode "format=json" \
+              --data-urlencode "friendly_name=SKYMAXX Health" \
+              --data-urlencode "url=${HEALTH_URL}" \
+              --data-urlencode "type=1" \
+              -o /tmp/A.json
+            cat /tmp/A.json
+            echo ""
+            
+            STAT=$(python3 -c "import json; print(json.load(open('/tmp/A.json')).get('stat'))" 2>/dev/null)
+            if [ "$STAT" = "ok" ]; then
+              ID=$(python3 -c "import json; print(json.load(open('/tmp/A.json')).get('monitor',{}).get('id',''))")
+              echo "✓ Created with minimal params! ID=$ID"
+              FINAL_ID=$ID
+            fi
+            
+            if [ -z "$FINAL_ID" ]; then
+              echo ""
+              echo "── Variation B: add interval explicitly ──"
+              curl -s -X POST "https://api.uptimerobot.com/v2/newMonitor" \
+                -H "Content-Type: application/x-www-form-urlencoded" \
+                --data-urlencode "api_key=${UR_KEY}" \
+                --data-urlencode "format=json" \
+                --data-urlencode "friendly_name=SKYMAXX Health" \
+                --data-urlencode "url=${HEALTH_URL}" \
+                --data-urlencode "type=1" \
+                --data-urlencode "interval=300" \
+                -o /tmp/B.json
+              cat /tmp/B.json
+              echo ""
+              STAT=$(python3 -c "import json; print(json.load(open('/tmp/B.json')).get('stat'))" 2>/dev/null)
+              if [ "$STAT" = "ok" ]; then
+                ID=$(python3 -c "import json; print(json.load(open('/tmp/B.json')).get('monitor',{}).get('id',''))")
+                echo "✓ Created with name+url+type+interval! ID=$ID"
+                FINAL_ID=$ID
+              fi
+            fi
+            
+            if [ -z "$FINAL_ID" ]; then
+              echo ""
+              echo "── Variation C: try sub_type=2 (default for free) ──"
+              curl -s -X POST "https://api.uptimerobot.com/v2/newMonitor" \
+                -H "Content-Type: application/x-www-form-urlencoded" \
+                --data-urlencode "api_key=${UR_KEY}" \
+                --data-urlencode "format=json" \
+                --data-urlencode "friendly_name=SKYMAXX Health" \
+                --data-urlencode "url=${HEALTH_URL}" \
+                --data-urlencode "type=1" \
+                --data-urlencode "interval=300" \
+                --data-urlencode "sub_type=2" \
+                -o /tmp/C.json
+              cat /tmp/C.json
+              echo ""
+            fi
+            
+            if [ -z "$FINAL_ID" ]; then
+              echo ""
+              echo "── Variation D: try the Ping type instead (type=3) ──"
+              curl -s -X POST "https://api.uptimerobot.com/v2/newMonitor" \
+                -H "Content-Type: application/x-www-form-urlencoded" \
+                --data-urlencode "api_key=${UR_KEY}" \
+                --data-urlencode "format=json" \
+                --data-urlencode "friendly_name=SKYMAXX Health Ping" \
+                --data-urlencode "url=skymaxx-lead-engine.onrender.com" \
+                --data-urlencode "type=3" \
+                -o /tmp/D.json
+              cat /tmp/D.json
+              echo ""
+            fi
+            
+            echo ""
+            echo "── Confirm current monitor list ──"
+            curl -s -X POST "https://api.uptimerobot.com/v2/getMonitors" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              --data-urlencode "api_key=${UR_KEY}" \
+              --data-urlencode "format=json" \
+              -o /tmp/list.json
+            python3 -c "
+          import json
+          d = json.load(open('/tmp/list.json'))
+          monitors = d.get('monitors', [])
+          print(f'Total: {len(monitors)}')
+          for m in monitors:
+              print(f\"  ID={m['id']} {m.get('friendly_name')} → {m.get('url')} (type={m.get('type')}, status={m.get('status')})\")"
+          } > urfix4.txt 2>&1
+          cat urfix4.txt
+          exit 0
+      - run: |
+          git config user.email "v@v.com"; git config user.name "V"
+          git add urfix4.txt
+          git commit -m "ur variations [skip ci]"
+          git push
