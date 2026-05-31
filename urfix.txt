@@ -1,0 +1,75 @@
+════════ UPTIMEROBOT DIAGNOSIS + FIX 07:26:10 ════════
+
+── STEP 1: Verify API key works (getAccountDetails) ──
+{
+    "stat": "ok",
+    "account": {
+        "email": "ali.shakeer@gmail.com",
+        "user_id": 3525516,
+        "firstname": "tkpthalayck",
+        "sms_credits": 0,
+        "payment_processor": null,
+        "payment_period": null,
+        "subscription_expiry_date": null,
+        "monitor_limit": 50,
+        "monitor_interval": 5,
+        "up_monitors": 0,
+        "down_monitors": 1,
+        "paused_monitors": 0,
+        "total_monitors_count": 1,
+        "registered_at": "2026-05-23T19:44:57.000Z",
+        "active_subscription": null,
+        "organizations": []
+    }
+}
+✓ API key valid
+
+── STEP 2: List ALL monitors ──
+Total monitors: 1
+
+  ID: 803140899
+  Name: skymaxx-lead-engine.onrender.com/api/stats
+  URL:  https://skymaxx-lead-engine.onrender.com/api/stats
+  Type: HTTP(s)
+  Status: ❌ DOWN
+  Interval: 300s
+  Timeout:  30s
+  HTTP Method: None
+  Recent logs:
+    - down at 1780001610 (Unauthorized)
+    - up at 1779781260 (OK)
+    - down at 1779706400 (Internal Server Error)
+
+
+── STEP 3: Find or determine target monitor ──
+  Found SKYMAXX monitor: ID=803140899
+
+── STEP 4: EDIT existing monitor 803140899 with correct settings ──
+{
+    "stat": "fail",
+    "error": {
+        "type": "invalid_parameter",
+        "message": "Monitor type cannot be changed after creation."
+    }
+}
+
+── STEP 5: RESUME monitor (in case it was paused) ──
+{
+    "stat": "ok",
+    "monitor": {
+        "id": 803140899
+    }
+}
+
+── STEP 6: Wait 30s and verify monitor is now active ──
+  Monitor ID:     803140899
+  Name:           skymaxx-lead-engine.onrender.com/api/stats
+  URL:            https://skymaxx-lead-engine.onrender.com/api/stats
+  Type:           HTTP(s)
+  Method:         None
+  Interval:       300s
+  Timeout:        30s
+  Keyword:        
+  Current Status: … NOT CHECKED YET (give it 5 min)
+
+════════ DONE ════════
