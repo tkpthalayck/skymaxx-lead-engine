@@ -548,7 +548,9 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
         </div>
       </div>
 
-      <div id="sequence-cards"></div>
+      <!-- Domain selector for sequences -->
+        <div id="domain-selector-sequences" style="display:flex;align-items:center;margin-bottom:14px;padding:12px 16px;background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.25);border-radius:8px"></div>
+        <div id="sequence-cards"></div>
 
       <div class="card">
         <div class="card-title"><i class="fas fa-flask"></i> Test Email</div>
@@ -715,15 +717,45 @@ let templates = [];
 let leadsPage = 1;
 let selected = new Set();
 
+let currentDomain = 'skymaxx';  // active domain for Sequences tab
+let allDomains = [];            // populated from /api/domains
+async function loadDomains() {
+  try {
+    const r = await fetch('/api/domains').then(x=>x.json());
+    allDomains = r.domains || [];
+    return allDomains;
+  } catch(e) { console.warn('loadDomains failed', e); return []; }
+}
+function renderDomainSelector(containerId, onChange) {
+  const el = document.getElementById(containerId);
+  if (!el || !allDomains.length) return;
+  el.innerHTML = '<label style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:8px;font-weight:600">Domain:</label>' +
+    '<select id="' + containerId + '-select" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;min-width:200px">' +
+    allDomains.map(d => '<option value="' + d.key + '"' + (d.key === currentDomain ? ' selected' : '') + '>' +
+      d.label + ' (' + d.audience.toUpperCase() + ')</option>').join('') +
+    '</select>';
+  const sel = document.getElementById(containerId + '-select');
+  if (sel && onChange) sel.addEventListener('change', (e) => onChange(e.target.value));
+}
+async function switchDomain(newDomain) {
+  if (!allDomains.find(d => d.key === newDomain)) return;
+  currentDomain = newDomain;
+  templates = await fetch('/api/sequence/templates?domain=' + encodeURIComponent(currentDomain)).then(r=>r.json());
+  if (typeof renderSequenceCards === 'function') renderSequenceCards();
+  if (typeof renderSequenceOverview === 'function') renderSequenceOverview();
+}
+
 async function init() {
   citiesList = await fetch('/api/cities').then(r=>r.json());
   prospectingTemplates = await fetch('/api/prospecting/templates').then(r=>r.json());
-  templates = await fetch('/api/sequence/templates').then(r=>r.json());
+  await loadDomains();
+  templates = await fetch('/api/sequence/templates?domain=' + encodeURIComponent(currentDomain)).then(r=>r.json());
 
   renderCategoriesGrid();
   renderCitiesGrid();
   renderSequenceCards();
   renderSequenceOverview();
+  renderDomainSelector('domain-selector-sequences', switchDomain);
   loadStats();
   loadLeads(1);
   loadQueue();
@@ -881,7 +913,7 @@ function renderSequenceCards() {
 
 // ─── EMAIL PREVIEW MODAL ───
 async function previewTemplate(step) {
-  const r = await fetch('/api/sequence/preview/'+step+'?name=Sarah%20Johnson').then(r=>r.json());
+  const r = await fetch('/api/sequence/preview/'+step+'?name=Sarah%20Johnson&domain=' + encodeURIComponent(currentDomain || 'skymaxx')).then(r=>r.json());
   showModal({
     title: `Email Preview — Step ${r.step}`,
     from: r.from_name + ' <' + r.from_email + '>',
@@ -1799,6 +1831,46 @@ async function qsSaveOnly() {
   renderQSResults();
 }
 
+function _promptDomain() {
+  // Returns selected domain key (or null if cancelled). Shows a styled dialog.
+  return new Promise((resolve) => {
+    if (!allDomains || !allDomains.length) {
+      // fallback
+      resolve('skymaxx');
+      return;
+    }
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+    overlay.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:28px;max-width:480px;width:90%;color:var(--text)">' +
+      '<h3 style="margin:0 0 6px;font-size:18px">Select Domain for Campaign</h3>' +
+      '<p style="margin:0 0 18px;font-size:13px;color:var(--muted)">Choose which domain\'s email sequence and branding this campaign will use. This determines the sender, templates, and links.</p>' +
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">' +
+      allDomains.map(d =>
+        '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all 0.15s">' +
+          '<input type="radio" name="campaign-domain" value="' + d.key + '"' + (d.key === 'skymaxx' ? ' checked' : '') + ' style="margin-top:3px">' +
+          '<div style="flex:1">' +
+            '<div style="font-weight:700;color:#fff;font-size:14px">' + d.label + '</div>' +
+            '<div style="font-size:12px;color:var(--muted);margin-top:2px">' + d.audience.toUpperCase() + ' &middot; from ' + d.sender_email + '</div>' +
+          '</div>' +
+        '</label>'
+      ).join('') +
+      '</div>' +
+      '<div style="display:flex;justify-content:flex-end;gap:8px">' +
+        '<button id="_dlg_cancel" class="btn btn-outline">Cancel</button>' +
+        '<button id="_dlg_ok" class="btn btn-primary">Continue</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(overlay);
+    document.getElementById('_dlg_cancel').onclick = () => { overlay.remove(); resolve(null); };
+    document.getElementById('_dlg_ok').onclick = () => {
+      const sel = overlay.querySelector('input[name="campaign-domain"]:checked');
+      const v = sel ? sel.value : 'skymaxx';
+      overlay.remove();
+      resolve(v);
+    };
+  });
+}
+
 async function createCampaign(mode) {
   // Leads-page campaign creation (selected leads OR all eligible)
   let leadIds;
@@ -1806,16 +1878,20 @@ async function createCampaign(mode) {
     if (!selected || !selected.size) { alert('Select at least one lead first (tick the checkboxes).'); return; }
     leadIds = Array.from(selected);
   } else if (mode === 'all') {
-    leadIds = 'all';  // backend resolves all eligible leads (with email, not already in sequence)
+    leadIds = 'all';  // backend resolves all eligible leads
   } else {
     leadIds = 'all';
   }
+  // Step 1: pick domain
+  const domainKey = await _promptDomain();
+  if (domainKey === null) return;  // cancelled
+  // Step 2: pick name
   const name = prompt('Campaign name:', 'Outreach ' + new Date().toLocaleDateString());
   if (name === null) return;
   try {
     const r = await fetch('/api/campaigns/draft', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name: name, lead_ids: leadIds})
+      body: JSON.stringify({name: name, lead_ids: leadIds, domain: domainKey})
     }).then(res => res.json());
     if (r.error) { alert('Could not create campaign: ' + r.error); return; }
     currentCampaignId = r.campaign_id;
@@ -2099,6 +2175,7 @@ async function loadGroups() {
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
         '<div>' +
           '<div style="font-weight:600;color:#fff;font-size:15px">' + escapeHtml(g.name) + '</div>' +
+          (g.domain_label ? '<div style="display:inline-block;font-size:10.5px;font-weight:700;color:#fff;background:' + (g.domain_accent || '#3b82f6') + ';padding:2px 8px;border-radius:10px;margin-top:4px;letter-spacing:.3px">' + escapeHtml(g.domain_label) + '</div>' : '') +
           (g.description ? '<div style="font-size:12px;color:var(--muted);margin-top:3px">' + escapeHtml(g.description) + '</div>' : '') +
         '</div>' +
         '<button class="btn btn-outline btn-xs" onclick="deleteGroup(' + g.id + ', \'' + escapeHtml(g.name).replace(/\'/g,'') + '\')"><i class="fas fa-trash"></i></button>' +
@@ -2240,7 +2317,7 @@ async function loadEditFieldsForCurrentStep() {
   if (bodyEl)    bodyEl.value    = currentAIEmail.body    || '';
   // Detect if this template is currently edited
   try {
-    const tplData = await fetch('/api/sequence/templates').then(r=>r.json());
+    const tplData = await fetch('/api/sequence/templates?domain=' + encodeURIComponent(currentDomain || 'skymaxx')).then(r=>r.json());
     const cur = tplData.find(t => t.step === currentAIEmail.step);
     const resetBtn = document.getElementById('ai-reset-btn');
     if (cur && cur.edited) {
@@ -2286,7 +2363,7 @@ async function saveEditedTemplate() {
     const res = await fetch('/api/sequence/save_template', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({step: currentAIEmail.step, subject, body})
+      body: JSON.stringify({step: currentAIEmail.step, subject, body, domain: currentDomain || 'skymaxx'})
     }).then(r=>r.json());
     if (res.error) {
       _toast('Save failed: ' + res.error, false);
@@ -2310,7 +2387,7 @@ async function resetTemplateToDefault() {
   if (!currentAIEmail) return;
   if (!confirm('Reset step ' + currentAIEmail.step + ' to the code default? This will discard your saved edits for this step.')) return;
   try {
-    const res = await fetch('/api/sequence/reset_template/' + currentAIEmail.step, {method:'POST'}).then(r=>r.json());
+    const res = await fetch('/api/sequence/reset_template/' + currentAIEmail.step + '?domain=' + encodeURIComponent(currentDomain || 'skymaxx'), {method:'POST'}).then(r=>r.json());
     if (res.error) {
       _toast('Reset failed: ' + res.error, false);
     } else {
