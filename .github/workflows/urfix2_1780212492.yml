@@ -1,0 +1,124 @@
+name: UptimeRobot Recreate
+on: { workflow_dispatch: }
+permissions: { contents: write }
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        env:
+          UR_KEY: 'u3525516-bfed29af5e19275b6d750d9f'
+          HEALTH_URL: 'https://skymaxx-lead-engine.onrender.com/api/health'
+          OLD_ID: '803140899'
+        run: |
+          set +e
+          {
+            echo "════════ UPTIMEROBOT RECREATE $(date -u +%H:%M:%S) ════════"
+            
+            echo ""
+            echo "── STEP 1: Delete broken monitor ${OLD_ID} (was pointing at /api/stats) ──"
+            curl -s -X POST "https://api.uptimerobot.com/v2/deleteMonitor" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -H "Cache-Control: no-cache" \
+              --data-urlencode "api_key=${UR_KEY}" \
+              --data-urlencode "format=json" \
+              --data-urlencode "id=${OLD_ID}" \
+              -o /tmp/del.json
+            cat /tmp/del.json | python3 -m json.tool
+            
+            echo ""
+            echo "── STEP 2: Create new Keyword monitor (validates JSON content, not just HTTP code) ──"
+            # type=2 = Keyword monitor; keyword_type=2 = "Down when keyword NOT present"
+            # http_method=2 = GET
+            # interval=300 = 5 min (free tier minimum)
+            curl -s -X POST "https://api.uptimerobot.com/v2/newMonitor" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -H "Cache-Control: no-cache" \
+              --data-urlencode "api_key=${UR_KEY}" \
+              --data-urlencode "format=json" \
+              --data-urlencode "friendly_name=SKYMAXX Lead Engine — Health Check" \
+              --data-urlencode "url=${HEALTH_URL}" \
+              --data-urlencode "type=2" \
+              --data-urlencode "keyword_type=2" \
+              --data-urlencode "keyword_case_type=0" \
+              --data-urlencode 'keyword_value="status":"ok"' \
+              --data-urlencode "http_method=2" \
+              --data-urlencode "interval=300" \
+              --data-urlencode "timeout=30" \
+              -o /tmp/new.json
+            cat /tmp/new.json | python3 -m json.tool
+            
+            NEW_ID=$(python3 -c "import json; d=json.load(open('/tmp/new.json')); print(d.get('monitor',{}).get('id',''))")
+            
+            if [ -z "$NEW_ID" ]; then
+              echo "❌ Failed to create monitor"
+              exit 0
+            fi
+            echo "✓ Created monitor ID: $NEW_ID"
+            
+            echo ""
+            echo "── STEP 3: Wait 60s for first health check ──"
+            sleep 60
+            
+            echo ""
+            echo "── STEP 4: Verify monitor status ──"
+            curl -s -X POST "https://api.uptimerobot.com/v2/getMonitors" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -H "Cache-Control: no-cache" \
+              --data-urlencode "api_key=${UR_KEY}" \
+              --data-urlencode "format=json" \
+              --data-urlencode "monitors=${NEW_ID}" \
+              --data-urlencode "logs=1" \
+              --data-urlencode "response_times=1" \
+              --data-urlencode "response_times_limit=5" \
+              -o /tmp/v.json
+            
+            python3 << PYEND
+          import json
+          d = json.load(open('/tmp/v.json'))
+          m = (d.get('monitors') or [{}])[0]
+          STATUS_MAP = {0:'⏸ PAUSED', 1:'… NOT CHECKED YET (wait 5 min)', 2:'✓ UP', 8:'⚠ SEEMS DOWN', 9:'❌ DOWN'}
+          TYPE_MAP   = {1:'HTTP(s)', 2:'Keyword'}
+          METHOD_MAP = {1:'HEAD', 2:'GET', 3:'POST'}
+          KW_TYPE    = {1:'Down when keyword EXISTS', 2:'Down when keyword NOT EXISTS'}
+          print(f"  Monitor ID:        {m.get('id')}")
+          print(f"  Name:              {m.get('friendly_name')}")
+          print(f"  URL:               {m.get('url')}")
+          print(f"  Type:              {TYPE_MAP.get(m.get('type'))}")
+          print(f"  HTTP Method:       {METHOD_MAP.get(m.get('http_method'))}")
+          print(f"  Interval:          {m.get('interval')}s")
+          print(f"  Timeout:           {m.get('timeout')}s")
+          print(f"  Keyword Type:      {KW_TYPE.get(m.get('keyword_type'))}")
+          print(f"  Keyword Value:     {m.get('keyword_value')}")
+          print(f"  CURRENT STATUS:    {STATUS_MAP.get(m.get('status'))}")
+          print(f"  Create Date:       {m.get('create_datetime')}")
+          
+          rt = m.get('response_times', [])
+          if rt:
+              print(f"  Recent response times:")
+              for r in rt[:5]:
+                  print(f"    {r.get('value')}ms at {r.get('datetime')}")
+          
+          logs = m.get('logs', [])
+          if logs:
+              print(f"  Recent log entries:")
+              for log in logs[:5]:
+                  ltype = {1:'down', 2:'up', 98:'started', 99:'paused'}.get(log.get('type'), log.get('type'))
+                  print(f"    - {ltype} at {log.get('datetime')} reason={log.get('reason',{}).get('detail','')}")
+          PYEND
+            
+            echo ""
+            echo "── STEP 5: Verify endpoint matches monitor config ──"
+            curl -sv "${HEALTH_URL}" 2>&1 | grep -E "^(< HTTP|< content-type|status|db)" | head -10
+            
+            echo ""
+            echo "════════ COMPLETE ════════"
+          } > urfix2.txt 2>&1
+          cat urfix2.txt
+          exit 0
+      - run: |
+          git config user.email "v@v.com"; git config user.name "V"
+          git add urfix2.txt
+          git commit -m "ur recreate [skip ci]"
+          git push
