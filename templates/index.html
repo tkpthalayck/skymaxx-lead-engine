@@ -510,15 +510,32 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
     <!-- ────────────────── MANAGE LEADS ────────────────── -->
     <div class="tab-panel" id="tab-leads">
       <div class="card">
-        <div class="filter-bar">
-          <input id="f-search" placeholder="🔍 Search by name, email, website..." oninput="loadLeads(1)"/>
-          <select id="f-seq" onchange="loadLeads(1)">
-            <option value="">All Statuses</option>
-            <option value="1">In Sequence</option>
-            <option value="0">Not Enrolled</option>
-          </select>
-          <button class="btn btn-outline btn-sm" onclick="loadLeads(1)"><i class="fas fa-sync"></i></button>
-          <div class="filter-actions">
+        <div class="filter-bar" style="display:flex;flex-direction:column;gap:10px">
+          <!-- ROW 1: Search + filters (Status / Email / Domain) + Page size + Refresh -->
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+            <input id="f-search" placeholder="🔍 Search by name, email, website..." oninput="loadLeads(1)" style="flex:1;min-width:240px"/>
+            <select id="f-seq" onchange="loadLeads(1)" style="min-width:150px" title="Sequence Status">
+              <option value="">All Statuses</option>
+              <option value="1">In Sequence</option>
+              <option value="0">Not Enrolled</option>
+            </select>
+            <select id="f-email" onchange="loadLeads(1)" style="min-width:160px" title="Email Availability">
+              <option value="">All Leads</option>
+              <option value="1" selected>✉ With Email</option>
+              <option value="0">No Email</option>
+            </select>
+            <select id="f-domain" onchange="loadLeads(1)" style="min-width:160px" title="Domain Filter">
+              <option value="">All Domains</option>
+            </select>
+            <select id="f-perpage" onchange="loadLeads(1)" style="min-width:90px" title="Per Page">
+              <option value="50" selected>50/page</option>
+              <option value="100">100/page</option>
+              <option value="200">200/page</option>
+            </select>
+            <button class="btn btn-outline btn-sm" onclick="loadLeads(1)" title="Refresh"><i class="fas fa-sync"></i></button>
+          </div>
+          <!-- ROW 2: Actions (Export / Clean / Add to Group / Delete / Campaigns) -->
+          <div class="filter-actions" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
             <button class="btn btn-outline btn-sm" onclick="window.location='/api/export'"><i class="fas fa-download"></i> Export CSV</button>
             <button class="btn btn-outline btn-sm" onclick="cleanNoEmail()"><i class="fas fa-broom"></i> Clean (no email)</button>
             <button class="btn btn-outline btn-sm" onclick="openAddToGroupModal()" id="bulk-grp-btn" disabled style="border-color:#60a5fa;color:#60a5fa"><i class="fas fa-folder-plus"></i> Add to Group</button>
@@ -760,6 +777,12 @@ async function init() {
   citiesList = await fetch('/api/cities').then(r=>r.json());
   prospectingTemplates = await fetch('/api/prospecting/templates').then(r=>r.json());
   await loadDomains();
+  // Populate domain filter dropdown on Leads page
+  const _df = document.getElementById('f-domain');
+  if (_df && allDomains && allDomains.length) {
+    _df.innerHTML = '<option value="">All Domains</option>' + 
+      allDomains.map(d => '<option value="' + d.key + '">' + d.label + '</option>').join('');
+  }
   templates = await fetch('/api/sequence/templates?domain=' + encodeURIComponent(currentDomain)).then(r=>r.json());
 
   renderCategoriesGrid();
@@ -1240,7 +1263,14 @@ async function loadLeads(page) {
   leadsPage = page;
   const search = document.getElementById('f-search').value;
   const inseq  = document.getElementById('f-seq').value;
-  const params = new URLSearchParams({page, per_page:25, search, in_sequence: inseq});
+  // Read new filters
+  const _emailFilter = (document.getElementById('f-email')?.value || '');
+  const _domainFilter = (document.getElementById('f-domain')?.value || '');
+  const _perPage = parseInt(document.getElementById('f-perpage')?.value || '50', 10);
+  const _paramObj = {page, per_page: Math.max(50, _perPage), search, in_sequence: inseq};
+  if (_emailFilter !== '') _paramObj.with_email = _emailFilter;
+  if (_domainFilter)        _paramObj.domain     = _domainFilter;
+  const params = new URLSearchParams(_paramObj);
   const r = await fetch('/api/leads?'+params).then(r=>r.json());
   const tb = document.getElementById('leads-tb');
   if (!r.leads.length) {
