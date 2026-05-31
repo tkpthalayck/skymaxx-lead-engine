@@ -1,0 +1,25 @@
+name: stats debug
+on: { workflow_dispatch: }
+permissions: { contents: write }
+jobs:
+  d:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          set +e
+          BASE="https://skymaxx-lead-engine.onrender.com"
+          {
+            curl -s -c /tmp/cj -X POST "$BASE/login" \
+              --data-urlencode "username=admin" --data-urlencode "password=SKYMAXX@2026" -o /dev/null
+            echo "=== raw /api/stats response ==="
+            curl -sv -b /tmp/cj "$BASE/api/stats" 2>&1 | tail -40
+          } > stats_dbg.txt 2>&1
+          cat stats_dbg.txt
+          exit 0
+      - run: |
+          git config user.email "v@v.com"; git config user.name "V"
+          git add stats_dbg.txt
+          git commit -m "dbg [skip ci]"
+          git push
