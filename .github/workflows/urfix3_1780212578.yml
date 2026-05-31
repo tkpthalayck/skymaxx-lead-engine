@@ -1,0 +1,148 @@
+name: UptimeRobot Create HTTP
+on: { workflow_dispatch: }
+permissions: { contents: write }
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        env:
+          UR_KEY: 'u3525516-bfed29af5e19275b6d750d9f'
+          HEALTH_URL: 'https://skymaxx-lead-engine.onrender.com/api/health'
+        run: |
+          set +e
+          {
+            echo "════════ UPTIMEROBOT — CREATE FREE-TIER COMPATIBLE MONITOR $(date -u +%H:%M:%S) ════════"
+            
+            echo ""
+            echo "── STEP 1: Confirm zero monitors right now ──"
+            curl -s -X POST "https://api.uptimerobot.com/v2/getMonitors" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              --data-urlencode "api_key=${UR_KEY}" \
+              --data-urlencode "format=json" \
+              -o /tmp/m1.json
+            python3 -c "
+          import json
+          d = json.load(open('/tmp/m1.json'))
+          print(f\"  Total monitors before create: {d.get('pagination',{}).get('total', len(d.get('monitors',[])))}\")"
+            
+            echo ""
+            echo "── STEP 2: Create basic HTTP(s) monitor (free-tier compatible) ──"
+            # Minimal create: only type=1 + url + name + interval
+            # No keyword params (those require paid plan)
+            # Default http_method varies by plan; we'll set explicitly to GET if allowed
+            curl -s -X POST "https://api.uptimerobot.com/v2/newMonitor" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -H "Cache-Control: no-cache" \
+              --data-urlencode "api_key=${UR_KEY}" \
+              --data-urlencode "format=json" \
+              --data-urlencode "friendly_name=SKYMAXX Lead Engine — Health" \
+              --data-urlencode "url=${HEALTH_URL}" \
+              --data-urlencode "type=1" \
+              --data-urlencode "interval=300" \
+              --data-urlencode "timeout=30" \
+              -o /tmp/c1.json
+            cat /tmp/c1.json | python3 -m json.tool
+            
+            STAT1=$(python3 -c "import json; print(json.load(open('/tmp/c1.json')).get('stat'))")
+            
+            if [ "$STAT1" != "ok" ]; then
+              echo ""
+              echo "── STEP 2b: Try absolute minimum (just type=1 + url + name + interval) ──"
+              curl -s -X POST "https://api.uptimerobot.com/v2/newMonitor" \
+                -H "Content-Type: application/x-www-form-urlencoded" \
+                --data-urlencode "api_key=${UR_KEY}" \
+                --data-urlencode "format=json" \
+                --data-urlencode "friendly_name=SKYMAXX Lead Engine - Health" \
+                --data-urlencode "url=${HEALTH_URL}" \
+                --data-urlencode "type=1" \
+                --data-urlencode "interval=300" \
+                -o /tmp/c2.json
+              cat /tmp/c2.json | python3 -m json.tool
+              NEW_ID=$(python3 -c "import json; print(json.load(open('/tmp/c2.json')).get('monitor',{}).get('id',''))")
+            else
+              NEW_ID=$(python3 -c "import json; print(json.load(open('/tmp/c1.json')).get('monitor',{}).get('id',''))")
+            fi
+            
+            if [ -z "$NEW_ID" ]; then
+              echo "❌ Both create attempts failed"
+              exit 0
+            fi
+            echo ""
+            echo "✓ Created monitor ID: $NEW_ID"
+            
+            echo ""
+            echo "── STEP 3: Wait 90s for first health check ──"
+            sleep 90
+            
+            echo ""
+            echo "── STEP 4: Verify monitor is UP ──"
+            curl -s -X POST "https://api.uptimerobot.com/v2/getMonitors" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              --data-urlencode "api_key=${UR_KEY}" \
+              --data-urlencode "format=json" \
+              --data-urlencode "monitors=${NEW_ID}" \
+              --data-urlencode "logs=1" \
+              --data-urlencode "response_times=1" \
+              --data-urlencode "response_times_limit=10" \
+              -o /tmp/v.json
+            
+            python3 << PYEND
+          import json
+          d = json.load(open('/tmp/v.json'))
+          m = (d.get('monitors') or [{}])[0]
+          STATUS_MAP = {0:'⏸ PAUSED', 1:'… NOT CHECKED YET', 2:'✓ UP', 8:'⚠ SEEMS DOWN', 9:'❌ DOWN'}
+          print()
+          print(f"  ╭─────────────────────────────────────────────────")
+          print(f"  │ MONITOR STATUS — {STATUS_MAP.get(m.get('status'))}")
+          print(f"  ╰─────────────────────────────────────────────────")
+          print(f"  Monitor ID:     {m.get('id')}")
+          print(f"  Name:           {m.get('friendly_name')}")
+          print(f"  URL:            {m.get('url')}")
+          print(f"  Type:           HTTP(s) basic check")
+          print(f"  Interval:       {m.get('interval')}s (every {m.get('interval')//60} min)")
+          print(f"  Timeout:        {m.get('timeout')}s")
+          print(f"  Created at:     {m.get('create_datetime')}")
+          
+          rt = m.get('response_times', [])
+          if rt:
+              print(f"  Recent response times:")
+              for r in rt[:5]:
+                  print(f"    {r.get('value')}ms")
+          
+          logs = m.get('logs', [])
+          if logs:
+              print(f"  Recent log entries:")
+              for log in logs[:5]:
+                  ltype = {1:'down', 2:'up', 98:'started', 99:'paused'}.get(log.get('type'), log.get('type'))
+                  print(f"    - {ltype} at {log.get('datetime')} — reason: {log.get('reason',{}).get('detail','')}")
+          PYEND
+            
+            echo ""
+            echo "── STEP 5: Account summary ──"
+            curl -s -X POST "https://api.uptimerobot.com/v2/getAccountDetails" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              --data-urlencode "api_key=${UR_KEY}" \
+              --data-urlencode "format=json" \
+              -o /tmp/acc.json
+            python3 -c "
+          import json
+          d = json.load(open('/tmp/acc.json')).get('account', {})
+          print(f\"  Account:  {d.get('email')}\")
+          print(f\"  Plan:     Free (limit {d.get('monitor_limit')} monitors, {d.get('monitor_interval')} min interval)\")
+          print(f\"  Up:       {d.get('up_monitors')}\")
+          print(f\"  Down:     {d.get('down_monitors')}\")
+          print(f\"  Paused:   {d.get('paused_monitors')}\")
+          print(f\"  Total:    {d.get('total_monitors_count')}\")"
+            
+            echo ""
+            echo "════════ COMPLETE ════════"
+          } > urfix3.txt 2>&1
+          cat urfix3.txt
+          exit 0
+      - run: |
+          git config user.email "v@v.com"; git config user.name "V"
+          git add urfix3.txt
+          git commit -m "ur final [skip ci]"
+          git push
