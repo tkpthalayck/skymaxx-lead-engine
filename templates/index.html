@@ -290,7 +290,7 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
 
   <div class="nav-section">
     <div class="nav-section-title">Configuration</div>
-    <div class="nav-item" onclick="tab('settings', this)"><i class="fas fa-cog"></i> Settings</div>
+    <div class="nav-item nav-item-settings" onclick="tab('settings', this)" style="color:#e2e8f0;font-weight:600;background:rgba(96,165,250,0.06);border-left:3px solid #60a5fa;margin:6px 0"><i class="fas fa-cog" style="color:#60a5fa"></i> Settings</div>
   </div>
 
   <div style="position:absolute;bottom:14px;left:22px;font-size:11px;color:var(--muted)">
@@ -323,6 +323,11 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
         <div class="stat-card cyan"><i class="fas fa-paper-plane icon"></i><div class="label">Today Sent</div><div class="value" id="s-today">—</div><div class="sub" id="s-limit">/ — daily limit</div></div>
         <div class="stat-card purple"><i class="fas fa-envelope-circle-check icon"></i><div class="label">Total Sent</div><div class="value" id="s-total-sent">—</div><div class="sub" id="s-failed">— failed</div></div>
       </div>
+
+      <!-- Per-domain breakdown + 7-day trend (Issue 5) -->
+      <div id="stats-warn" style="display:none;margin-bottom:14px;padding:10px 14px;background:rgba(251,191,36,0.1);border:1px solid #fbbf24;border-radius:8px;color:#fbbf24;font-size:13px"></div>
+      <div id="stats-by-domain" style="margin-bottom:18px"></div>
+      <div id="stats-7d-trend" style="margin-bottom:18px"></div>
 
       <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:14px">
         <div class="card">
@@ -516,6 +521,7 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
           <div class="filter-actions">
             <button class="btn btn-outline btn-sm" onclick="window.location='/api/export'"><i class="fas fa-download"></i> Export CSV</button>
             <button class="btn btn-outline btn-sm" onclick="cleanNoEmail()"><i class="fas fa-broom"></i> Clean (no email)</button>
+            <button class="btn btn-outline btn-sm" onclick="openAddToGroupModal()" id="bulk-grp-btn" disabled style="border-color:#60a5fa;color:#60a5fa"><i class="fas fa-folder-plus"></i> Add to Group</button>
             <button class="btn btn-danger btn-sm" onclick="bulkDelete()" id="bulk-del-btn" disabled><i class="fas fa-trash"></i> Delete Selected</button>
             <button class="btn btn-purple btn-sm" onclick="createCampaign('selected')" id="bulk-enroll-btn" disabled><i class="fas fa-rocket"></i> Campaign Selected</button>
             <button class="btn btn-success btn-sm" onclick="createCampaign('all')"><i class="fas fa-rocket"></i> Campaign All Eligible</button>
@@ -549,7 +555,7 @@ code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px
       </div>
 
       <!-- Domain selector for sequences -->
-        <div id="domain-selector-sequences" style="display:flex;align-items:center;margin-bottom:14px;padding:12px 16px;background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.25);border-radius:8px"></div>
+        <div id="domain-selector-sequences" style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;padding:14px 18px;background:#1e293b;border:1px solid #475569;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.2)"></div>
         <div id="sequence-cards"></div>
 
       <div class="card">
@@ -729,13 +735,18 @@ async function loadDomains() {
 function renderDomainSelector(containerId, onChange) {
   const el = document.getElementById(containerId);
   if (!el || !allDomains.length) return;
-  el.innerHTML = '<label style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:8px;font-weight:600">Domain:</label>' +
-    '<select id="' + containerId + '-select" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;min-width:200px">' +
-    allDomains.map(d => '<option value="' + d.key + '"' + (d.key === currentDomain ? ' selected' : '') + '>' +
-      d.label + ' (' + d.audience.toUpperCase() + ')</option>').join('') +
+  // Solid colors guaranteed visible in any theme; options explicitly styled too
+  el.innerHTML = '<label style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-right:10px;font-weight:700">Domain:</label>' +
+    '<select id="' + containerId + '-select" style="background-color:#0f172a;background-image:linear-gradient(45deg,transparent 50%,#60a5fa 50%),linear-gradient(135deg,#60a5fa 50%,transparent 50%);background-position:calc(100% - 18px) center,calc(100% - 12px) center;background-size:6px 6px,6px 6px;background-repeat:no-repeat;border:1.5px solid #334155;color:#ffffff;padding:8px 38px 8px 12px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;min-width:260px;-webkit-appearance:none;-moz-appearance:none;appearance:none;outline:none">' +
+    allDomains.map(d => '<option value="' + d.key + '"' + (d.key === currentDomain ? ' selected' : '') + ' style="background-color:#0f172a;color:#ffffff;padding:8px">' +
+      d.label + ' \u00b7 ' + d.audience.toUpperCase() + '</option>').join('') +
     '</select>';
   const sel = document.getElementById(containerId + '-select');
-  if (sel && onChange) sel.addEventListener('change', (e) => onChange(e.target.value));
+  if (sel) {
+    sel.addEventListener('focus', () => sel.style.borderColor = '#60a5fa');
+    sel.addEventListener('blur',  () => sel.style.borderColor = '#334155');
+    if (onChange) sel.addEventListener('change', (e) => onChange(e.target.value));
+  }
 }
 async function switchDomain(newDomain) {
   if (!allDomains.find(d => d.key === newDomain)) return;
@@ -823,6 +834,61 @@ async function loadStats() {
     if (document.getElementById('s-limit')) document.getElementById('s-limit').textContent = '/ ' + (s.daily_limit ?? 300) + ' daily limit';
     if (document.getElementById('s-total-sent')) document.getElementById('s-total-sent').textContent = s.total_sent ?? 0;
     if (document.getElementById('s-failed'))     document.getElementById('s-failed').textContent     = (s.total_failed ?? 0) + ' failed';
+    
+    // NEW: per-domain breakdown table (Issue 5)
+    const byDom = document.getElementById('stats-by-domain');
+    if (byDom && s.sent_by_domain) {
+      const domains = (typeof allDomains !== 'undefined' && allDomains.length) ? allDomains : [
+        {key:'skymaxx',label:'SKYMAXX.Company',accent:'#60a5fa'},
+        {key:'toolsshopy',label:'ToolsShopy.Store',accent:'#f97316'},
+        {key:'royalgroups',label:'RoyalGroups.Shop',accent:'#a78bfa'}
+      ];
+      byDom.innerHTML = '<div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:700">Activity by Domain</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">' +
+        domains.map(d => {
+          const sent = (s.sent_by_domain || {})[d.key] || 0;
+          const leads = (s.leads_by_domain || {})[d.key] || 0;
+          const active = (s.active_campaigns_by_domain || {})[d.key] || 0;
+          return '<div style="background:#1e293b;border:1px solid #334155;border-left:4px solid ' + (d.accent || '#60a5fa') + ';border-radius:8px;padding:14px 16px">' +
+            '<div style="font-weight:700;color:#fff;font-size:13px;margin-bottom:8px">' + d.label + '</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">' +
+              '<div><div style="font-size:18px;font-weight:700;color:#fff">' + sent + '</div><div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Emails Sent</div></div>' +
+              '<div><div style="font-size:18px;font-weight:700;color:#fff">' + leads + '</div><div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Leads</div></div>' +
+              '<div><div style="font-size:18px;font-weight:700;color:#fff">' + active + '</div><div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Active</div></div>' +
+            '</div>' +
+          '</div>';
+        }).join('') + '</div>';
+    }
+    
+    // NEW: 7-day trend chart (Issue 5)
+    const trend = document.getElementById('stats-7d-trend');
+    if (trend && s.sent_last_7d) {
+      const maxCount = Math.max(1, ...s.sent_last_7d.map(d => d.count));
+      trend.innerHTML = '<div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:700">Last 7 Days — Emails Sent</div>' +
+        (s.sent_last_7d.length === 0 
+          ? '<div style="padding:20px;color:#94a3b8;font-size:13px;text-align:center;background:#1e293b;border:1px solid #334155;border-radius:8px">No sends in the last 7 days</div>'
+          : '<div style="display:flex;align-items:flex-end;gap:6px;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:14px;min-height:140px">' +
+            s.sent_last_7d.map(d => {
+              const pct = Math.round((d.count / maxCount) * 100);
+              return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">' +
+                '<div style="font-size:11px;color:#fff;font-weight:600">' + d.count + '</div>' +
+                '<div style="width:100%;height:' + Math.max(4, pct) + 'px;background:linear-gradient(180deg,#60a5fa,#3b82f6);border-radius:4px 4px 0 0;min-height:4px"></div>' +
+                '<div style="font-size:10px;color:#94a3b8">' + (d.date || '').slice(5) + '</div>' +
+              '</div>';
+            }).join('') + '</div>');
+    }
+    
+    // Cross-check warning: if today_sent vs today_sent_from_log mismatch by > 1
+    if (s.today_sent !== undefined && s.today_sent_from_log !== undefined) {
+      const diff = Math.abs((s.today_sent || 0) - (s.today_sent_from_log || 0));
+      if (diff > 1) {
+        const warn = document.getElementById('stats-warn');
+        if (warn) {
+          warn.style.display = 'block';
+          warn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Counter drift: daily_send_count says ' + s.today_sent + ' but email_log shows ' + s.today_sent_from_log + ' today.';
+        }
+      }
+    }
 
     if ((s.total_leads ?? 0) > 0) {
       const b = document.getElementById('nav-leads-count');
@@ -909,6 +975,69 @@ function renderSequenceCards() {
         <button class="ai-btn" onclick="openAIPanel(${t.step})"><i class="fas fa-wand-magic-sparkles"></i> AI Assistant</button>
       </div>
     </div>`).join('');
+}
+
+// ─── ADD-TO-GROUP MODAL (Issue 4) ───
+async function openAddToGroupModal() {
+  if (!selected || !selected.size) { alert('Select at least one lead first (tick the checkboxes).'); return; }
+  const leadIds = Array.from(selected);
+  // Fetch current groups
+  let groups = [];
+  try {
+    const r = await fetch('/api/groups').then(x=>x.json());
+    groups = r.groups || [];
+  } catch (e) { alert('Could not load groups: ' + e.message); return; }
+  if (!groups.length) { alert('No contact groups exist yet. Create one in the Groups tab first.'); return; }
+  
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:28px;max-width:520px;width:90%;color:#fff;max-height:80vh;overflow-y:auto">' +
+    '<h3 style="margin:0 0 6px;font-size:18px;color:#fff">Add ' + leadIds.length + ' Lead' + (leadIds.length === 1 ? '' : 's') + ' to Group</h3>' +
+    '<p style="margin:0 0 18px;font-size:13px;color:#94a3b8">Choose a contact group to add the selected leads to. Leads can be in multiple groups.</p>' +
+    '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;max-height:340px;overflow-y:auto">' +
+    groups.map(g => 
+      '<label style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #334155;border-radius:8px;cursor:pointer;background:#1e293b">' +
+        '<input type="radio" name="add-to-group" value="' + g.id + '" style="margin:0">' +
+        '<div style="flex:1">' +
+          '<div style="font-weight:700;color:#fff;font-size:14px">' + escapeHtml(g.name) + '</div>' +
+          (g.domain_label ? '<div style="display:inline-block;font-size:10.5px;font-weight:700;color:#fff;background:' + (g.domain_accent || '#3b82f6') + ';padding:2px 8px;border-radius:10px;margin-top:4px">' + escapeHtml(g.domain_label) + '</div>' : '') +
+          '<div style="font-size:12px;color:#94a3b8;margin-top:3px">' + (g.lead_count || 0) + ' existing leads</div>' +
+        '</div>' +
+      '</label>'
+    ).join('') +
+    '</div>' +
+    '<div style="display:flex;justify-content:flex-end;gap:8px">' +
+      '<button id="_g_cancel" class="btn btn-outline">Cancel</button>' +
+      '<button id="_g_ok" class="btn btn-primary">Add to Group</button>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('_g_cancel').onclick = () => overlay.remove();
+  document.getElementById('_g_ok').onclick = async () => {
+    const sel = overlay.querySelector('input[name="add-to-group"]:checked');
+    if (!sel) { alert('Please select a group'); return; }
+    const gid = sel.value;
+    const okBtn = document.getElementById('_g_ok');
+    okBtn.disabled = true; okBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+    try {
+      const r = await fetch('/api/groups/' + gid + '/add', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({lead_ids: leadIds})
+      }).then(res => res.json());
+      if (r.error) { alert('Error: ' + r.error); okBtn.disabled = false; okBtn.innerHTML = 'Add to Group'; return; }
+      overlay.remove();
+      // Toast + refresh
+      if (typeof _toast === 'function') _toast('Added ' + (r.added || leadIds.length) + ' lead(s) to group');
+      else alert('Added ' + (r.added || leadIds.length) + ' lead(s) to group');
+      // Clear selection
+      if (selected && selected.clear) selected.clear();
+      if (typeof loadLeads === 'function') loadLeads(typeof leadsPage !== 'undefined' ? leadsPage : 1);
+      if (typeof loadGroups === 'function') loadGroups();
+    } catch (e) {
+      alert('Error: ' + e.message);
+      okBtn.disabled = false; okBtn.innerHTML = 'Add to Group';
+    }
+  };
 }
 
 // ─── EMAIL PREVIEW MODAL ───
@@ -1157,6 +1286,7 @@ function toggleAll(chk) {
 function toggleSel(id, chk) {
   chk.checked ? selected.add(id) : selected.delete(id);
   document.getElementById('bulk-del-btn').disabled = !selected.size;
+  const _grpBtn = document.getElementById("bulk-grp-btn"); if (_grpBtn) _grpBtn.disabled = !selected.size;
   document.getElementById('bulk-enroll-btn').disabled = !selected.size;
 }
 
