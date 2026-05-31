@@ -1,0 +1,64 @@
+name: Health Endpoint Anonymous Test
+on: { workflow_dispatch: }
+permissions: { contents: write }
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          set +e
+          BASE="https://skymaxx-lead-engine.onrender.com"
+          {
+            echo "════════ HEALTH ENDPOINT ANONYMOUS TEST $(date -u +%H:%M:%S) ════════"
+            echo "(Simulating what UptimeRobot does — no cookies, no auth)"
+            echo ""
+            
+            echo "── 1. HEAD /api/health (some monitors use HEAD) ──"
+            curl -sI -o /dev/null -w "  Status: %{http_code}  TimeTotal: %{time_total}s\n" "$BASE/api/health"
+            
+            echo ""
+            echo "── 2. GET /api/health (anonymous, full response) ──"
+            curl -s -w "\n  HTTP=%{http_code} time=%{time_total}s size=%{size_download}b\n" "$BASE/api/health"
+            
+            echo ""
+            echo "── 3. With User-Agent like UptimeRobot ──"
+            curl -s -w "\n  HTTP=%{http_code} time=%{time_total}s\n" \
+              -A "Mozilla/5.0 (compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)" \
+              "$BASE/api/health"
+            
+            echo ""
+            echo "── 4. With keyword check (UptimeRobot can look for 'status':'ok') ──"
+            BODY=$(curl -s "$BASE/api/health")
+            echo "  Full body: $BODY"
+            echo "$BODY" | grep -q '"status":"ok"' && echo "  ✓ Keyword \"status\":\"ok\" PRESENT" || echo "  ✗ Keyword MISSING"
+            
+            echo ""
+            echo "── 5. Test from external probe IP simulation (DNS resolution) ──"
+            host skymaxx-lead-engine.onrender.com 8.8.8.8
+            
+            echo ""
+            echo "── 6. SSL certificate check ──"
+            echo | openssl s_client -servername skymaxx-lead-engine.onrender.com \
+              -connect skymaxx-lead-engine.onrender.com:443 2>/dev/null | \
+              openssl x509 -noout -dates -subject 2>/dev/null | head -5
+            
+            echo ""
+            echo "── 7. Try POST to /api/health (some monitor configs do this; should still work or 405) ──"
+            curl -s -X POST -w "\n  POST HTTP=%{http_code}\n" "$BASE/api/health" | head -3
+            
+            echo ""
+            echo "── 8. Check if redirect chain interferes ──"
+            curl -sLI -w "  Final URL: %{url_effective}\n  Total redirects: %{num_redirects}\n" -o /dev/null "$BASE/api/health"
+            
+            echo ""
+            echo "════════ DIAGNOSIS ════════"
+          } > hcheck.txt 2>&1
+          cat hcheck.txt
+          exit 0
+      - run: |
+          git config user.email "v@v.com"; git config user.name "V"
+          git add hcheck.txt
+          git commit -m "health check [skip ci]"
+          git push
