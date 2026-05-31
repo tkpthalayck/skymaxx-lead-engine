@@ -1,0 +1,19 @@
+name: Final Health Check
+on: { workflow_dispatch: }
+permissions: { contents: write }
+jobs:
+  h:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          {
+            curl -s -w "\nHTTP=%{http_code} time=%{time_total}s\n" https://skymaxx-lead-engine.onrender.com/api/health
+          } > final.txt 2>&1
+          cat final.txt
+      - run: |
+          git config user.email "v@v.com"; git config user.name "V"
+          git add final.txt
+          git commit -m "final [skip ci]"
+          git push
