@@ -1,0 +1,53 @@
+════ ALL-5-ISSUES VERIFICATION 07:03:27 ════
+Login: 302
+
+── ISSUE 3 FIX: preview returns domain-specific sender ──
+  Domain=skymaxx:
+    from = SKYMAXX Support Team <support@skymaxx.company>
+    domain_label = SKYMAXX.Company
+    {company} literal in body: NO ✓
+    sample company rendered:    YES ✓
+  Domain=toolsshopy:
+    from = ToolsShopy Team <support@toolsshopy.store>
+    domain_label = ToolsShopy.Store
+    {company} literal in body: NO ✓
+    sample company rendered:    no
+  Domain=royalgroups:
+    from = RoyalGroups Team <support@royalgroups.shop>
+    domain_label = RoyalGroups.Shop
+    {company} literal in body: NO ✓
+    sample company rendered:    no
+
+── ISSUE 5 FIX: enhanced stats with per-domain + 7-day ──
+Traceback (most recent call last):
+  File "<string>", line 3, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+── ISSUE 4 SANITY: /api/groups/<id>/add endpoint still works ──
+  SKYMAXX group id: 1
+
+── ISSUE 1+2 SANITY: HTML contains expected styling ──
+  dropdown bg #0f172a refs: 2
+  nav-item-settings class:  1
+  openAddToGroupModal fn:   2
+  stats-by-domain DOM:      2
+  stats-7d-trend DOM:       2
+  Add-to-Group btn:         2
+
+── Backward compat: existing endpoints still work ──
+  /api/health:           HTTP 200
+  /api/domains:          HTTP 200
+  /api/groups:           HTTP 200
+  /api/campaigns:        HTTP 200
+  /api/leads:            HTTP 200
