@@ -1,0 +1,16 @@
+════════ UPTIMEROBOT — BARE-MINIMUM CREATE TEST 07:30:58 ════════
+
+── Variation A: only friendly_name + url + type ──
+{"stat":"fail","error":{"type":"access_denied","message":"You are not allowed to use some settings with your current plan."}}
+
+── Variation B: add interval explicitly ──
+{"stat":"fail","error":{"type":"access_denied","message":"You are not allowed to use some settings with your current plan."}}
+
+── Variation C: try sub_type=2 (default for free) ──
+{"stat":"fail","error":{"type":"access_denied","message":"You are not allowed to use some settings with your current plan."}}
+
+── Variation D: try the Ping type instead (type=3) ──
+{"stat":"fail","error":{"type":"access_denied","message":"You are not allowed to use some settings with your current plan."}}
+
+── Confirm current monitor list ──
+Total: 0
