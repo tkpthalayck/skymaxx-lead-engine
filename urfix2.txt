@@ -1,0 +1,19 @@
+════════ UPTIMEROBOT RECREATE 07:28:23 ════════
+
+── STEP 1: Delete broken monitor 803140899 (was pointing at /api/stats) ──
+{
+    "stat": "ok",
+    "monitor": {
+        "id": 803140899
+    }
+}
+
+── STEP 2: Create new Keyword monitor (validates JSON content, not just HTTP code) ──
+{
+    "stat": "fail",
+    "error": {
+        "type": "access_denied",
+        "message": "You are not allowed to use some settings with your current plan."
+    }
+}
+❌ Failed to create monitor
