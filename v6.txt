@@ -1,0 +1,76 @@
+════ V6 VERIFICATION 12:02:53 ════
+Login: 302
+
+── 1. /api/leads accepts with_email filter ──
+  All leads:
+    total=220 leads
+  With email:
+    total=220 leads
+  Without email:
+    total=0 leads
+
+── 2. per_page=50 works ──
+    returned=50 of total=220
+
+── 3. /api/leads accepts domain filter ──
+  domain=skymaxx: 220 leads
+  domain=toolsshopy: 0 leads
+  domain=royalgroups: 0 leads
+
+── 4. SKYMAXX templates include new services ──
+  Step 1:
+    ✓ USD 200
+    ✓ MSP360
+    ✓ website
+    ✓ modernization
+    ✓ backup
+    ✓ continuity
+  Step 2:
+      USD 200
+      MSP360
+    ✓ website
+      modernization
+    ✓ backup
+    ✓ continuity
+  Step 3:
+    ✓ USD 200
+    ✓ MSP360
+    ✓ website
+      modernization
+    ✓ backup
+      continuity
+  Step 4:
+    ✓ USD 200
+    ✓ MSP360
+    ✓ website
+    ✓ modernization
+    ✓ backup
+    ✓ continuity
+  Step 5:
+    ✓ USD 200
+    ✓ MSP360
+    ✓ website
+    ✓ modernization
+    ✓ backup
+    ✓ continuity
+
+── 5. HTML page contains new UI elements ──
+  f-email (email filter):  1
+  f-domain (domain filt):  1
+  f-perpage (per page):    1
+  50/page option:          1
+  With Email option:       1
+
+── 6. Other domains unchanged ──
+  toolsshopy step1: MSP360=False USD200=False (should both be False)
+  royalgroups step1: MSP360=False USD200=False (should both be False)
+
+── 7. Preview for SKYMAXX step 1 renders cleanly ──
+  subject: Office 365 Email Services for Acme Corp - productivity, security, cost
+  from: SKYMAXX Support Team <support@skymaxx.company>
+  body size: 7,150b
+  has USD 200 mention: True
+  has MSP360 mention:  True
+  has {company} literal: False (should be False - personalized)
+
+════ DONE ════
