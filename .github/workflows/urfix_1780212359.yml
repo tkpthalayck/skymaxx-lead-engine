@@ -1,0 +1,195 @@
+name: UptimeRobot Fix
+on: { workflow_dispatch: }
+permissions: { contents: write }
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        env:
+          UR_KEY: 'u3525516-bfed29af5e19275b6d750d9f'
+          HEALTH_URL: 'https://skymaxx-lead-engine.onrender.com/api/health'
+        run: |
+          set +e
+          {
+            echo "════════ UPTIMEROBOT DIAGNOSIS + FIX $(date -u +%H:%M:%S) ════════"
+            
+            echo ""
+            echo "── STEP 1: Verify API key works (getAccountDetails) ──"
+            curl -s -X POST "https://api.uptimerobot.com/v2/getAccountDetails" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -H "Cache-Control: no-cache" \
+              -d "api_key=${UR_KEY}&format=json" \
+              -o /tmp/acct.json
+            cat /tmp/acct.json | python3 -m json.tool
+            
+            STAT=$(python3 -c "import json; d=json.load(open('/tmp/acct.json')); print(d.get('stat','?'))")
+            if [ "$STAT" != "ok" ]; then
+              echo "❌ API key invalid or wrong format"
+              ERR=$(python3 -c "import json; d=json.load(open('/tmp/acct.json')); print(d.get('error',{}).get('message',d))" 2>/dev/null)
+              echo "Error: $ERR"
+              exit 0
+            fi
+            echo "✓ API key valid"
+            
+            echo ""
+            echo "── STEP 2: List ALL monitors ──"
+            curl -s -X POST "https://api.uptimerobot.com/v2/getMonitors" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -H "Cache-Control: no-cache" \
+              -d "api_key=${UR_KEY}&format=json&logs=1&response_times=1" \
+              -o /tmp/mons.json
+            
+            python3 << 'PYEND'
+          import json
+          d = json.load(open('/tmp/mons.json'))
+          monitors = d.get('monitors', [])
+          print(f"Total monitors: {len(monitors)}")
+          print()
+          # status codes: 0=paused, 1=not checked yet, 2=up, 8=seems down, 9=down
+          STATUS_MAP = {0:'⏸ PAUSED', 1:'… NOT CHECKED', 2:'✓ UP', 8:'⚠ SEEMS DOWN', 9:'❌ DOWN'}
+          TYPE_MAP   = {1:'HTTP(s)', 2:'Keyword', 3:'Ping', 4:'Port', 5:'Heartbeat'}
+          METHOD_MAP = {1:'HEAD', 2:'GET', 3:'POST', 4:'PUT', 5:'PATCH', 6:'DELETE', 7:'OPTIONS'}
+          for m in monitors:
+              print(f"  ID: {m['id']}")
+              print(f"  Name: {m.get('friendly_name')}")
+              print(f"  URL:  {m.get('url')}")
+              print(f"  Type: {TYPE_MAP.get(m.get('type'), m.get('type'))}")
+              print(f"  Status: {STATUS_MAP.get(m.get('status'), m.get('status'))}")
+              print(f"  Interval: {m.get('interval')}s")
+              print(f"  Timeout:  {m.get('timeout')}s")
+              if m.get('type') == 1 or m.get('type') == 2:
+                  print(f"  HTTP Method: {METHOD_MAP.get(m.get('http_method'), m.get('http_method'))}")
+              if m.get('type') == 2:
+                  print(f"  Keyword: {m.get('keyword_value')}")
+              # Recent log entries
+              logs = m.get('logs', [])
+              if logs:
+                  print(f"  Recent logs:")
+                  for log in logs[:3]:
+                      ltype = {1:'down', 2:'up', 98:'started', 99:'paused'}.get(log.get('type'), log.get('type'))
+                      print(f"    - {ltype} at {log.get('datetime')} ({log.get('reason',{}).get('detail','')})")
+              print()
+          PYEND
+            
+            echo ""
+            echo "── STEP 3: Find or determine target monitor ──"
+            
+            TARGET_ID=$(python3 << 'PYEND'
+          import json
+          d = json.load(open('/tmp/mons.json'))
+          monitors = d.get('monitors', [])
+          # Look for one with skymaxx in URL or matching friendly_name
+          for m in monitors:
+              url = (m.get('url') or '').lower()
+              name = (m.get('friendly_name') or '').lower()
+              if 'skymaxx' in url or 'skymaxx' in name or m.get('id') == 803140899:
+                  print(m['id'])
+                  break
+          PYEND
+          )
+            
+            if [ -z "$TARGET_ID" ]; then
+              echo "  No existing SKYMAXX monitor found. Will CREATE new one."
+              CREATE_NEW=1
+            else
+              echo "  Found SKYMAXX monitor: ID=$TARGET_ID"
+              CREATE_NEW=0
+            fi
+            
+            echo ""
+            if [ "$CREATE_NEW" = "1" ]; then
+              echo "── STEP 4: CREATE new monitor ──"
+              curl -s -X POST "https://api.uptimerobot.com/v2/newMonitor" \
+                -H "Content-Type: application/x-www-form-urlencoded" \
+                -H "Cache-Control: no-cache" \
+                --data-urlencode "api_key=${UR_KEY}" \
+                --data-urlencode "format=json" \
+                --data-urlencode "friendly_name=SKYMAXX Lead Engine — Health" \
+                --data-urlencode "url=${HEALTH_URL}" \
+                --data-urlencode "type=2" \
+                --data-urlencode "keyword_type=2" \
+                --data-urlencode "keyword_case_type=0" \
+                --data-urlencode "keyword_value=\"status\":\"ok\"" \
+                --data-urlencode "http_method=2" \
+                --data-urlencode "interval=300" \
+                --data-urlencode "timeout=30" \
+                -o /tmp/new.json
+              cat /tmp/new.json | python3 -m json.tool
+              TARGET_ID=$(python3 -c "import json; d=json.load(open('/tmp/new.json')); print(d.get('monitor',{}).get('id',''))")
+              echo "  Created monitor ID: $TARGET_ID"
+            else
+              echo "── STEP 4: EDIT existing monitor $TARGET_ID with correct settings ──"
+              # Update URL, method, interval, timeout, keyword
+              curl -s -X POST "https://api.uptimerobot.com/v2/editMonitor" \
+                -H "Content-Type: application/x-www-form-urlencoded" \
+                -H "Cache-Control: no-cache" \
+                --data-urlencode "api_key=${UR_KEY}" \
+                --data-urlencode "format=json" \
+                --data-urlencode "id=${TARGET_ID}" \
+                --data-urlencode "friendly_name=SKYMAXX Lead Engine — Health" \
+                --data-urlencode "url=${HEALTH_URL}" \
+                --data-urlencode "type=2" \
+                --data-urlencode "keyword_type=2" \
+                --data-urlencode "keyword_case_type=0" \
+                --data-urlencode "keyword_value=\"status\":\"ok\"" \
+                --data-urlencode "http_method=2" \
+                --data-urlencode "interval=300" \
+                --data-urlencode "timeout=30" \
+                -o /tmp/edit.json
+              cat /tmp/edit.json | python3 -m json.tool
+              
+              echo ""
+              echo "── STEP 5: RESUME monitor (in case it was paused) ──"
+              curl -s -X POST "https://api.uptimerobot.com/v2/editMonitor" \
+                -H "Content-Type: application/x-www-form-urlencoded" \
+                -H "Cache-Control: no-cache" \
+                --data-urlencode "api_key=${UR_KEY}" \
+                --data-urlencode "format=json" \
+                --data-urlencode "id=${TARGET_ID}" \
+                --data-urlencode "status=1" \
+                -o /tmp/resume.json
+              cat /tmp/resume.json | python3 -m json.tool
+            fi
+            
+            echo ""
+            echo "── STEP 6: Wait 30s and verify monitor is now active ──"
+            sleep 30
+            
+            curl -s -X POST "https://api.uptimerobot.com/v2/getMonitors" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -H "Cache-Control: no-cache" \
+              --data-urlencode "api_key=${UR_KEY}" \
+              --data-urlencode "format=json" \
+              --data-urlencode "monitors=${TARGET_ID}" \
+              -o /tmp/verify.json
+            
+            python3 << PYEND
+          import json
+          d = json.load(open('/tmp/verify.json'))
+          m = (d.get('monitors') or [{}])[0]
+          STATUS_MAP = {0:'⏸ PAUSED', 1:'… NOT CHECKED YET (give it 5 min)', 2:'✓ UP', 8:'⚠ SEEMS DOWN', 9:'❌ DOWN'}
+          TYPE_MAP   = {1:'HTTP(s)', 2:'Keyword', 3:'Ping', 4:'Port', 5:'Heartbeat'}
+          METHOD_MAP = {1:'HEAD', 2:'GET', 3:'POST'}
+          print(f"  Monitor ID:     {m.get('id')}")
+          print(f"  Name:           {m.get('friendly_name')}")
+          print(f"  URL:            {m.get('url')}")
+          print(f"  Type:           {TYPE_MAP.get(m.get('type'))}")
+          print(f"  Method:         {METHOD_MAP.get(m.get('http_method'))}")
+          print(f"  Interval:       {m.get('interval')}s")
+          print(f"  Timeout:        {m.get('timeout')}s")
+          print(f"  Keyword:        {m.get('keyword_value')}")
+          print(f"  Current Status: {STATUS_MAP.get(m.get('status'))}")
+          PYEND
+            
+            echo ""
+            echo "════════ DONE ════════"
+          } > urfix.txt 2>&1
+          cat urfix.txt
+          exit 0
+      - run: |
+          git config user.email "v@v.com"; git config user.name "V"
+          git add urfix.txt
+          git commit -m "ur fix [skip ci]"
+          git push
