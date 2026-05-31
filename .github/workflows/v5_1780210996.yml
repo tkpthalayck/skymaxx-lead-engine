@@ -1,0 +1,89 @@
+name: Issues 1-5 Fix Verification
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          set +e
+          BASE="https://skymaxx-lead-engine.onrender.com"
+          {
+            echo "════ ALL-5-ISSUES VERIFICATION $(date -u +%H:%M:%S) ════"
+            curl -s -c /tmp/cj -X POST "$BASE/login" \
+              --data-urlencode "username=admin" --data-urlencode "password=SKYMAXX@2026" \
+              -o /dev/null -w "Login: %{http_code}\n"
+            
+            echo ""
+            echo "── ISSUE 3 FIX: preview returns domain-specific sender ──"
+            for D in skymaxx toolsshopy royalgroups; do
+              echo "  Domain=$D:"
+              curl -s -b /tmp/cj "$BASE/api/sequence/preview/1?domain=$D&name=Sarah%20Johnson" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print(f\"    from = {d.get('from_name')} <{d.get('from_email')}>\")
+          print(f\"    domain_label = {d.get('domain_label')}\")
+          body = d.get('body','')
+          has_literal = '{{company}}' in body
+          has_acme = 'Acme Corp' in body or '[your name]' in body
+          print(f\"    {{company}} literal in body: {'YES BAD' if has_literal else 'NO ✓'}\")
+          print(f\"    sample company rendered:    {'YES ✓' if has_acme else 'no'}\")"
+            done
+            
+            echo ""
+            echo "── ISSUE 5 FIX: enhanced stats with per-domain + 7-day ──"
+            curl -s -b /tmp/cj "$BASE/api/stats" | python3 -c "
+          import sys, json
+          s = json.load(sys.stdin)
+          print(f'  total_sent:           {s.get(\"total_sent\")}')
+          print(f'  today_sent:           {s.get(\"today_sent\")} (from daily_send_count)')
+          print(f'  today_sent_from_log:  {s.get(\"today_sent_from_log\")} (cross-check from email_log)')
+          print(f'  sent_by_domain:       {s.get(\"sent_by_domain\")}')
+          print(f'  leads_by_domain:      {s.get(\"leads_by_domain\")}')
+          print(f'  active_campaigns_by_domain: {s.get(\"active_campaigns_by_domain\")}')
+          print(f'  sent_last_7d:         {len(s.get(\"sent_last_7d\", []))} days w/ data')
+          for d in s.get('sent_last_7d', []):
+              print(f'    {d[\"date\"]}: {d[\"count\"]}')
+          print(f'  total_campaigns:      {s.get(\"total_campaigns\")}')
+          print(f'  active_campaigns:     {s.get(\"active_campaigns\")}')
+          print(f'  total_groups:         {s.get(\"total_groups\")}')"
+            
+            echo ""
+            echo "── ISSUE 4 SANITY: /api/groups/<id>/add endpoint still works ──"
+            GID=$(curl -s -b /tmp/cj "$BASE/api/groups" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          for g in d.get('groups', []):
+              if g.get('name') == 'SKYMAXX.Company Leads':
+                  print(g['id']); break")
+            echo "  SKYMAXX group id: $GID"
+            
+            echo ""
+            echo "── ISSUE 1+2 SANITY: HTML contains expected styling ──"
+            curl -s -b /tmp/cj "$BASE/" -o /tmp/idx.html
+            grep -c "background-color:#0f172a" /tmp/idx.html | awk '{print "  dropdown bg #0f172a refs: "$1}'
+            grep -c "nav-item-settings" /tmp/idx.html | awk '{print "  nav-item-settings class:  "$1}'
+            grep -c "openAddToGroupModal" /tmp/idx.html | awk '{print "  openAddToGroupModal fn:   "$1}'
+            grep -c "stats-by-domain" /tmp/idx.html | awk '{print "  stats-by-domain DOM:      "$1}'
+            grep -c "stats-7d-trend" /tmp/idx.html | awk '{print "  stats-7d-trend DOM:       "$1}'
+            grep -c "bulk-grp-btn" /tmp/idx.html | awk '{print "  Add-to-Group btn:         "$1}'
+            
+            echo ""
+            echo "── Backward compat: existing endpoints still work ──"
+            curl -s -b /tmp/cj "$BASE/api/health" -w "  /api/health:           HTTP %{http_code}\n" -o /dev/null
+            curl -s -b /tmp/cj "$BASE/api/domains" -w "  /api/domains:          HTTP %{http_code}\n" -o /dev/null
+            curl -s -b /tmp/cj "$BASE/api/groups" -w "  /api/groups:           HTTP %{http_code}\n" -o /dev/null
+            curl -s -b /tmp/cj "$BASE/api/campaigns" -w "  /api/campaigns:        HTTP %{http_code}\n" -o /dev/null
+            curl -s -b /tmp/cj "$BASE/api/leads?per_page=1" -w "  /api/leads:            HTTP %{http_code}\n" -o /dev/null
+          } > v5_result.txt 2>&1
+          cat v5_result.txt
+          exit 0
+      - run: |
+          git config user.email "v@v.com"; git config user.name "V"
+          git add v5_result.txt
+          git commit -m "v5 result [skip ci]"
+          git push
