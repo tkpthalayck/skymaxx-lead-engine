@@ -2186,7 +2186,7 @@ def index(): return render_template("index.html")
 
 @app.route("/api/stats")
 def stats():
-    """Dashboard stats — bulletproof, never raises 500."""
+    """Dashboard stats — bulletproof, never raises 500. Includes per-domain breakdown + 7-day trend."""
     def _safe_count(sql, default=0):
         try:
             c = get_db()
@@ -2206,7 +2206,93 @@ def stats():
             print(f"[stats] {fn.__name__ if hasattr(fn,'__name__') else 'fn'} → {type(e).__name__}: {e}")
             return default
 
+    def _safe_rows(sql, default=None):
+        try:
+            c = get_db()
+            try:
+                rows = c.execute(sql).fetchall()
+                return rows_to_list(rows) if rows else (default or [])
+            finally:
+                try: c.close()
+                except: pass
+        except Exception as e:
+            print(f"[stats] rows {sql[:60]}... → {type(e).__name__}: {e}")
+            return default or []
+
+    # Cross-check: count from email_log using TODAY (UTC) — alternative to daily_send_count
+    today_utc = datetime.utcnow().strftime("%Y-%m-%d")
+    today_from_log = _safe_count(
+        f"SELECT COUNT(*) FROM email_log WHERE status='success' AND DATE(sent_at)='{today_utc}'"
+    )
+
+    # Per-domain sent counts (via campaigns join)
+    sent_by_domain = {}
+    try:
+        rows = _safe_rows("""SELECT c.domain_key AS dk, COUNT(el.id) AS cnt
+                             FROM email_log el
+                             LEFT JOIN leads l ON el.lead_id = l.id
+                             LEFT JOIN campaigns c ON l.campaign_id = c.id
+                             WHERE el.status='success'
+                             GROUP BY c.domain_key""")
+        for r in rows:
+            dk = (r.get("dk") if isinstance(r, dict) else r[0]) or "skymaxx"
+            cnt = r.get("cnt") if isinstance(r, dict) else r[1]
+            sent_by_domain[dk] = int(cnt or 0)
+    except Exception as e:
+        print(f"[stats] sent_by_domain err: {e}")
+        sent_by_domain = {}
+    # Ensure all configured domains present (even with 0)
+    for dk in DOMAIN_CONFIG.keys():
+        if dk not in sent_by_domain:
+            sent_by_domain[dk] = 0
+
+    # Last 7 days trend (success only) — for charting in UI
+    sent_last_7d = []
+    try:
+        rows = _safe_rows(f"""SELECT DATE(sent_at) AS d, COUNT(*) AS cnt
+                              FROM email_log
+                              WHERE status='success' AND sent_at >= '{(datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")}'
+                              GROUP BY DATE(sent_at) ORDER BY d""")
+        for r in rows:
+            sent_last_7d.append({
+                "date": str(r.get("d") if isinstance(r, dict) else r[0]),
+                "count": int(r.get("cnt") if isinstance(r, dict) else r[1] or 0)
+            })
+    except Exception as e:
+        print(f"[stats] 7d trend err: {e}")
+
+    # Per-domain lead counts
+    leads_by_domain = {}
+    try:
+        rows = _safe_rows("SELECT COALESCE(domain_key,'skymaxx') AS dk, COUNT(*) AS cnt FROM leads GROUP BY domain_key")
+        for r in rows:
+            dk = (r.get("dk") if isinstance(r, dict) else r[0]) or "skymaxx"
+            cnt = r.get("cnt") if isinstance(r, dict) else r[1]
+            leads_by_domain[dk] = int(cnt or 0)
+    except Exception as e:
+        print(f"[stats] leads_by_domain err: {e}")
+    for dk in DOMAIN_CONFIG.keys():
+        if dk not in leads_by_domain:
+            leads_by_domain[dk] = 0
+
+    # Active campaigns by domain
+    active_campaigns_by_domain = {}
+    try:
+        rows = _safe_rows("""SELECT COALESCE(domain_key,'skymaxx') AS dk, COUNT(*) AS cnt
+                             FROM campaigns WHERE status IN ('approved','running')
+                             GROUP BY domain_key""")
+        for r in rows:
+            dk = (r.get("dk") if isinstance(r, dict) else r[0]) or "skymaxx"
+            cnt = r.get("cnt") if isinstance(r, dict) else r[1]
+            active_campaigns_by_domain[dk] = int(cnt or 0)
+    except Exception as e:
+        print(f"[stats] active_campaigns err: {e}")
+    for dk in DOMAIN_CONFIG.keys():
+        if dk not in active_campaigns_by_domain:
+            active_campaigns_by_domain[dk] = 0
+
     s = {
+        # Existing fields (backward compatible)
         "total_leads":   _safe_count("SELECT COUNT(*) FROM leads"),
         "in_sequence":   _safe_count("SELECT COUNT(*) FROM leads WHERE in_sequence=1"),
         "with_email":    _safe_count("SELECT COUNT(*) FROM leads WHERE email IS NOT NULL AND email != ''"),
@@ -2216,6 +2302,17 @@ def stats():
         "bcc_support":   BCC_SUPPORT if "BCC_SUPPORT" in globals() else True,
         "total_sent":    _safe_count("SELECT COUNT(*) FROM email_log WHERE status='success'"),
         "total_failed":  _safe_count("SELECT COUNT(*) FROM email_log WHERE status='failed'"),
+        # NEW: enhanced visibility
+        "today_sent_from_log":      today_from_log,  # cross-check with daily_send_count
+        "sent_by_domain":           sent_by_domain,
+        "leads_by_domain":          leads_by_domain,
+        "active_campaigns_by_domain": active_campaigns_by_domain,
+        "sent_last_7d":             sent_last_7d,
+        "total_campaigns":          _safe_count("SELECT COUNT(*) FROM campaigns"),
+        "active_campaigns":         _safe_count("SELECT COUNT(*) FROM campaigns WHERE status IN ('approved','running')"),
+        "total_groups":             _safe_count("SELECT COUNT(*) FROM contact_groups"),
+        "total_sending_pending":    _safe_count("SELECT COUNT(*) FROM email_log WHERE status='sending'"),
+        "as_of_utc":                datetime.utcnow().isoformat() + "Z",
     }
     return jsonify(s)
 
@@ -2797,13 +2894,24 @@ def template_preview(step):
         return jsonify({"error": "invalid step"}), 400
     name = request.args.get("name", "Sarah Johnson")
     tpl = get_effective_template_for_step(step, domain_key)
-    fake_lead = {"name": name, "city": "Dubai", "website": "example.com"}
+    # Domain-specific sender + sample company so {{company}} renders properly
+    dcfg = DOMAIN_CONFIG.get(domain_key, DOMAIN_CONFIG["skymaxx"])
+    sample_company = "Acme Corp" if dcfg["audience"] == "b2b" else "[your name]"
+    fake_lead = {
+        "name":    name,
+        "city":    "Dubai" if dcfg["audience"] == "b2b" else "Austin",
+        "website": "example.com",
+        "company": sample_company,
+        "first_name": name.split(" ")[0] if name else "Sarah",
+    }
     return jsonify({
-        "step":    tpl["step"],
-        "subject": personalize(tpl["subject"], fake_lead),
-        "body":    personalize(tpl["body"], fake_lead),
-        "from_email": FROM_EMAIL,
-        "from_name":  FROM_NAME,
+        "step":       tpl["step"],
+        "subject":    personalize(tpl["subject"], fake_lead),
+        "body":       personalize(tpl["body"], fake_lead),
+        "from_email": dcfg["sender_email"],
+        "from_name":  dcfg["sender_name"],
+        "domain":     domain_key,
+        "domain_label": dcfg["label"],
     })
 
 
