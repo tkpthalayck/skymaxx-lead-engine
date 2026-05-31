@@ -1,0 +1,106 @@
+name: V6 Filter+Sequences Verify
+on: { workflow_dispatch: }
+permissions: { contents: write }
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          set +e
+          BASE="https://skymaxx-lead-engine.onrender.com"
+          {
+            echo "════ V6 VERIFICATION $(date -u +%H:%M:%S) ════"
+            curl -s -c /tmp/cj -X POST "$BASE/login" \
+              --data-urlencode "username=admin" --data-urlencode "password=SKYMAXX@2026" \
+              -o /dev/null -w "Login: %{http_code}\n"
+            
+            echo ""
+            echo "── 1. /api/leads accepts with_email filter ──"
+            echo "  All leads:"
+            curl -s -b /tmp/cj "$BASE/api/leads?per_page=1" | python3 -c "import sys,json;d=json.load(sys.stdin);print(f'    total={d.get(\"total\")} leads')"
+            echo "  With email:"
+            curl -s -b /tmp/cj "$BASE/api/leads?per_page=1&with_email=1" | python3 -c "import sys,json;d=json.load(sys.stdin);print(f'    total={d.get(\"total\")} leads')"
+            echo "  Without email:"
+            curl -s -b /tmp/cj "$BASE/api/leads?per_page=1&with_email=0" | python3 -c "import sys,json;d=json.load(sys.stdin);print(f'    total={d.get(\"total\")} leads')"
+            
+            echo ""
+            echo "── 2. per_page=50 works ──"
+            curl -s -b /tmp/cj "$BASE/api/leads?per_page=50&with_email=1" | python3 -c "
+          import sys,json
+          d = json.load(sys.stdin)
+          print(f'    returned={len(d.get(\"leads\",[]))} of total={d.get(\"total\")}')"
+            
+            echo ""
+            echo "── 3. /api/leads accepts domain filter ──"
+            for D in skymaxx toolsshopy royalgroups; do
+              CNT=$(curl -s -b /tmp/cj "$BASE/api/leads?per_page=1&domain=$D" | python3 -c "import sys,json;print(json.load(sys.stdin).get('total',0))")
+              echo "  domain=$D: $CNT leads"
+            done
+            
+            echo ""
+            echo "── 4. SKYMAXX templates include new services ──"
+            for STEP in 1 2 3 4 5; do
+              echo "  Step $STEP:"
+              curl -s -b /tmp/cj "$BASE/api/sequence/templates?domain=skymaxx" | python3 -c "
+          import sys, json
+          tpls = json.load(sys.stdin)
+          t = tpls[$STEP-1]
+          body = t['body']
+          markers = {
+              'USD 200':    'USD 200' in body,
+              'MSP360':     'MSP360' in body,
+              'website':    'website' in body.lower(),
+              'modernization': 'modernization' in body.lower() or 'redesign' in body.lower(),
+              'backup':     'backup' in body.lower(),
+              'continuity': 'continuity' in body.lower(),
+          }
+          for k, v in markers.items():
+              print(f'    {\"✓\" if v else \" \"} {k}')"
+            done
+            
+            echo ""
+            echo "── 5. HTML page contains new UI elements ──"
+            curl -s -b /tmp/cj "$BASE/" -o /tmp/idx.html
+            grep -c 'id="f-email"' /tmp/idx.html | awk '{print "  f-email (email filter):  "$1}'
+            grep -c 'id="f-domain"' /tmp/idx.html | awk '{print "  f-domain (domain filt):  "$1}'
+            grep -c 'id="f-perpage"' /tmp/idx.html | awk '{print "  f-perpage (per page):    "$1}'
+            grep -c '50/page' /tmp/idx.html | awk '{print "  50/page option:          "$1}'
+            grep -c '✉ With Email' /tmp/idx.html | awk '{print "  With Email option:       "$1}'
+            
+            echo ""
+            echo "── 6. Other domains unchanged ──"
+            for D in toolsshopy royalgroups; do
+              curl -s -b /tmp/cj "$BASE/api/sequence/templates?domain=$D" | python3 -c "
+          import sys, json
+          tpls = json.load(sys.stdin)
+          body = tpls[0]['body']
+          has_msp = 'MSP360' in body
+          has_usd = 'USD 200' in body
+          print(f'  $D step1: MSP360={has_msp} USD200={has_usd} (should both be False)')"
+            done
+            
+            echo ""
+            echo "── 7. Preview for SKYMAXX step 1 renders cleanly ──"
+            curl -s -b /tmp/cj "$BASE/api/sequence/preview/1?domain=skymaxx&name=Sarah%20Johnson" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print(f'  subject: {d.get(\"subject\")}')
+          print(f'  from: {d.get(\"from_name\")} <{d.get(\"from_email\")}>')
+          body = d.get('body', '')
+          print(f'  body size: {len(body):,}b')
+          print(f'  has USD 200 mention: {\"USD 200\" in body}')
+          print(f'  has MSP360 mention:  {\"MSP360\" in body}')
+          print(f'  has {{company}} literal: {\"{{company}}\" in body} (should be False - personalized)')"
+            
+            echo ""
+            echo "════ DONE ════"
+          } > v6.txt 2>&1
+          cat v6.txt
+          exit 0
+      - run: |
+          git config user.email "v@v.com"; git config user.name "V"
+          git add v6.txt
+          git commit -m "v6 [skip ci]"
+          git push
