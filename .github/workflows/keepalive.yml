@@ -1,0 +1,34 @@
+name: SKYMAXX Keep-Alive Ping
+# Pings /api/health on a schedule to keep Render free-tier warm.
+# GitHub Actions cron is BEST-EFFORT (5-min request can run anywhere from 5-15 min later).
+# For more reliable keep-alive, set up cron-job.com or upgrade UptimeRobot.
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # every 10 minutes
+  workflow_dispatch:
+permissions: { contents: read }
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping /api/health
+        run: |
+          URL="https://skymaxx-lead-engine.onrender.com/api/health"
+          echo "Pinging $URL at $(date -u +%H:%M:%S) UTC"
+          # Up to 3 retries with 20s timeout; fail job if all fail
+          for i in 1 2 3; do
+            HTTP=$(curl -s -o /tmp/r.json -w "%{http_code}" --max-time 25 -A "SKYMAXX-KeepAlive-GH-Actions/1.0" "$URL")
+            BODY=$(cat /tmp/r.json 2>/dev/null | head -c 300)
+            echo "  Attempt $i: HTTP $HTTP  body=$BODY"
+            if [ "$HTTP" = "200" ] && echo "$BODY" | grep -q '"status":"ok"'; then
+              echo "  ✓ Healthy"
+              exit 0
+            fi
+            [ $i -lt 3 ] && sleep 15
+          done
+          echo "❌ All 3 attempts failed"
+          exit 1
